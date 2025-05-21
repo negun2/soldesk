@@ -1,0 +1,18 @@
+# vars/RedHat.yml
+apache_package_name: "httpd"
+apache_dev_package_name: "httpd-devel"
+mod_wsgi_package_name: "python36u-mod_wsgi" # 또는 시스템 Python3에 맞는 IUS 패키지명
+python_virtualenv_package_name: "python3-virtualenv"
+python_dev_package_name: "python3-devel" # 또는 python36u-devel 등
+readline_dev_package_name: "readline-devel"
+zlib_dev_package_name: "zlib-devel"
+libffi_dev_package_name: "libffi-devel"
+libssl_dev_package_name: "openssl-devel"
+policycoreutils_package_name: "policycoreutils-python-utils"
+
+# Django Environment Play용
+apache_user: "apache"
+apache_group: "apache"
+apache_conf_dir: "/etc/httpd/conf.d"
+apache_service_name: "httpd"
+mod_wsgi_load_file_content: "LoadModule wsgi_module modules/mod_wsgi_python3.so" # 실제 .so 파일명 확인 필요
