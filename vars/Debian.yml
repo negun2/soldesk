@@ -1,20 +1,18 @@
 # vars/Debian.yml
-# Base System and Dependencies Play용
+python_dev_package_name: "python3-dev"
 apache_package_name: "apache2"
 apache_dev_package_name: "apache2-dev"
-mod_wsgi_package_name: "libapache2-mod-wsgi-py3"
-python_virtualenv_package_name: "python3-venv" # Ubuntu 표준
-python_dev_package_name: "python3-dev"
+mod_wsgi_package_name_system: "libapache2-mod-wsgi-py3" # 시스템 Apache용 mod_wsgi
+python_virtualenv_package_name: "python3-venv"
 readline_dev_package_name: "libreadline-dev"
 zlib_dev_package_name: "zlib1g-dev"
 libffi_dev_package_name: "libffi-dev"
 libssl_dev_package_name: "libssl-dev"
-policycoreutils_package_name: "python3-policycoreutils" # sefcontext 모듈용 (정확한 이름 확인)
-
-# Django Environment Play용 (이전과 동일)
+policycoreutils_package_name: "python3-policycoreutils" # 또는 필요한 다른 SELinux/AppArmor 유틸
+# Django 플레이용 변수들도 여기에 정의하거나 별도 _django.yml 파일 사용
 apache_user: "www-data"
 apache_group: "www-data"
 apache_conf_dir: "/etc/apache2/sites-available"
 apache_sites_enabled_dir: "/etc/apache2/sites-enabled"
 apache_service_name: "apache2"
-mod_wsgi_load_file_content: "" # Debian에서는 패키지가 보통 자동으로 처리
+mod_wsgi_load_file_content_django: "" # Debian에서는 보통 불필요
