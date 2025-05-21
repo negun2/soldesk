@@ -1,16 +1,24 @@
 # vars/RedHat.yml
+# Base System and Dependencies Play용
 apache_package_name: "httpd"
 apache_dev_package_name: "httpd-devel"
-mod_wsgi_package_name: "python36u-mod_wsgi" # 또는 시스템 Python3에 맞는 IUS 패키지명
-python_virtualenv_package_name: "python3-virtualenv"
-python_dev_package_name: "python3-devel" # 또는 python36u-devel 등
+# mod_wsgi_package_name: "python36-mod_wsgi" # IUS에서 찾은 정확한 이름 또는 시스템 python3용 mod_wsgi
+mod_wsgi_package_name: "mod_wsgi" # python3-mod_wsgi 설치가 안되어서 python36u-mod_wsgi로 했었음.
+                                     # IUS 저장소를 추가했다면 python36u-mod_wsgi 가 맞을 수 있음.
+                                     # CentOS 7 기본 python3 (3.6.x)용 mod_wsgi가 epel에 있다면 그 이름을 사용.
+                                     # 일반적으로 `yum install python3-pip`로 설치된 pip3로 가상환경 만들고
+                                     # 가상환경에 `pip install mod_wsgi`하는 것이 더 일반적.
+                                     # 이 경우 시스템 레벨 mod_wsgi는 Apache 모듈 로드용으로만 필요.
+                                     # 만약 IUS python36u를 시스템 기본으로 사용한다면 python36u-mod_wsgi.
+python_virtualenv_package_name: "python3-virtualenv" # 또는 python3-pip으로 설치된 venv 사용
+python_dev_package_name: "python3-devel"
 readline_dev_package_name: "readline-devel"
 zlib_dev_package_name: "zlib-devel"
 libffi_dev_package_name: "libffi-devel"
 libssl_dev_package_name: "openssl-devel"
 policycoreutils_package_name: "policycoreutils-python-utils"
 
-# Django Environment Play용
+# Django Environment Play용 (이전과 동일)
 apache_user: "apache"
 apache_group: "apache"
 apache_conf_dir: "/etc/httpd/conf.d"
