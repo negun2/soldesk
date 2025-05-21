@@ -17,7 +17,6 @@
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
 
-
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 이 경로는 /root/downloaded_vars 가 됨
 
   tasks:
@@ -41,12 +40,12 @@
     - name: Include RedHat variables
       include_vars: "{{ downloaded_vars_dir }}/RedHat.yml"
       when: ansible_os_family == "RedHat"
-      ignore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
+      #gnore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
 
     - name: Include Debian variables
       include_vars: "{{ downloaded_vars_dir }}/Debian.yml"
       when: ansible_os_family == "Debian"
-      ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
+      #ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
 
     - name: Display content of downloaded Debian.yml for debugging
       command: "cat {{ downloaded_vars_dir }}/Debian.yml"
@@ -59,14 +58,6 @@
       debug:
         var: debian_vars_content.stdout_lines
       when: ansible_os_family == "Debian" and debian_vars_content.stdout is defined
-
-    - name: Include OS-specific variables from downloaded files
-      include_vars: "{{ item }}"
-      with_first_found:
-        - files:
-            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
-            # - "{{ downloaded_vars_dir }}/default.yml" # 공통 기본값 파일
-          skip: true # 파일이 없어도 오류 발생 안 함
 
     # --- RedHat 계열 패키지 설치 ---
     - name: Install base packages (RedHat family)
