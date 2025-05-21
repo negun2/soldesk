@@ -48,6 +48,15 @@
       when: ansible_os_family == "Debian"
       #ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
 
+    - name: Verify loaded Debian variables
+      debug:
+        msg:
+          - "OS Family: {{ ansible_os_family }}"
+          - "Python Dev Pkg (after include): {{ python_dev_package_name | default('NOT DEFINED IN CURRENT SCOPE') }}"
+          - "Apache Pkg (after include): {{ apache_package_name | default('NOT DEFINED IN CURRENT SCOPE') }}"
+          # ... (확인하고 싶은 다른 주요 변수들) ...
+      when: ansible_os_family == "Debian"
+
     - name: Display content of downloaded Debian.yml for debugging
       command: "cat {{ downloaded_vars_dir }}/Debian.yml"
       register: debian_vars_content
