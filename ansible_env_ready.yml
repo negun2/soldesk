@@ -17,8 +17,6 @@
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
 
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 이 경로는 /root/downloaded_vars 가 됨
-
   tasks:
     - name: Create directory for downloaded OS vars files
       file:
