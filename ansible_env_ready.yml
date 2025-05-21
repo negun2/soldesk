@@ -16,7 +16,6 @@
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
-
   tasks:
     - name: Create directory for downloaded OS vars files
       file:
@@ -28,7 +27,7 @@
       get_url:
         url: "{{ os_vars_base_url }}/{{ item }}"
         dest: "{{ downloaded_vars_dir }}/{{ item }}"
-        mode: '0755'
+        mode: '0644'
       loop:
         - "RedHat.yml"
         - "Debian.yml"
@@ -242,6 +241,13 @@
         creates: "{{ venv_dir }}/bin/activate"
       become_user: "{{ target_user }}"
 
+    - name: Install wheel in virtual environment before mod_wsgi
+      pip:
+        name: wheel
+        virtualenv: "{{ venv_dir }}"
+        virtualenv_python: python3
+      become_user: "{{ target_user }}" # 가상환경 작업은 해당 사용자 권한으로
+
     - name: Install Django and mod_wsgi in virtual environment
       pip:
         name:
@@ -261,12 +267,30 @@
       when: ansible_os_family == "RedHat"
       notify: Restart Apache
 
-    - name: Enable wsgi module on Debian family
-      command: "a2enmod wsgi_py3" # Ubuntu/Debian은 패키지 설치 시 모듈이 준비되고, a2enmod로 활성화
-      args:
-        creates: "/etc/apache2/mods-enabled/wsgi_py3.load" # 또는 wsgi.load
+    - name: Check for wsgi_py3 module availability (Debian family)
+      stat:
+        path: "/etc/apache2/mods-available/wsgi_py3.load" # 일반적인 파일명
+      register: wsgi_py3_load_file_stat
       when: ansible_os_family == "Debian"
+
+    - name: Check for wsgi (generic) module availability (Debian family) - fallback
+      stat:
+        path: "/etc/apache2/mods-available/wsgi.load" # 다른 가능한 파일명
+      register: wsgi_load_file_stat
+      when: ansible_os_family == "Debian" and not wsgi_py3_load_file_stat.stat.exists
+
+    - name: Determine correct wsgi module name for a2enmod (Debian family)
+      set_fact:
+        apache_wsgi_module_name_debian: "{{ 'wsgi_py3' if wsgi_py3_load_file_stat.stat.exists else ('wsgi' if wsgi_load_file_stat.stat.exists else '') }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Enable wsgi module on Debian family
+      command: "a2enmod {{ apache_wsgi_module_name_debian }}"
+      args:
+        creates: "/etc/apache2/mods-enabled/{{ apache_wsgi_module_name_debian }}.load"
+      when: ansible_os_family == "Debian" and apache_wsgi_module_name_debian # 모듈 이름이 결정되었을 때만 실행
       notify: Restart Apache
+      changed_when: true # a2enmod는 성공 시 항상 changed 상태를 반환하도록 가정 (또는 register + changed_when 사용)
 
     - name: Create Django project
       command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} {{ project_root_dir }}"
