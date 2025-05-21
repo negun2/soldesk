@@ -37,22 +37,16 @@
         # 추가적인 OS별 _django.yml 파일 등을 사용한다면 여기에 추가
       ignore_errors: yes # 특정 파일이 없을 경우 대비
 
-    - name: Include OS-specific variables from downloaded directory
-      include_vars:
-        dir: "{{ downloaded_vars_dir }}" # /root/downloaded_vars 디렉토리 지정
-        # extensions: ['yml', 'yaml'] # 기본적으로 yml, yaml, json 로드
-        # name: os_vars # 로드된 변수들을 os_vars.RedHat.python_dev_package_name 등으로 그룹화 (선택 사항)
-      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat" # 해당 OS 파일만 로드하도록 제한
 
     - name: Include RedHat variables
-      include_vars: "{{ downloaded_vars_dir }}/RedHat.yml"
+      include_vars: "{{ downloaded_vars_dir }}/RedHat.yml" # /root/downloaded_vars/RedHat.yml
       when: ansible_os_family == "RedHat"
-      #gnore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
+      ignore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
 
     - name: Include Debian variables
-      include_vars: "{{ downloaded_vars_dir }}/Debian.yml"
+      include_vars: "{{ downloaded_vars_dir }}/Debian.yml" # /root/downloaded_vars/Debian.yml
       when: ansible_os_family == "Debian"
-      #ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
+      ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
 
     - name: Display content of downloaded Debian.yml for debugging
       command: "cat {{ downloaded_vars_dir }}/Debian.yml"
