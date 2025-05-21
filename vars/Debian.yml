@@ -8,7 +8,7 @@ readline_dev_package_name: "libreadline-dev"
 zlib_dev_package_name: "zlib1g-dev"
 libffi_dev_package_name: "libffi-dev"
 libssl_dev_package_name: "libssl-dev"
-# policycoreutils_package_name: "python3-policycoreutils" # AppArmor 사용 시 불필요할 수 있음
+policycoreutils_package_name: "python3-policycoreutils" # AppArmor 사용 시 불필요할 수 있음
 
 # Django Environment Play용
 apache_user: "www-data"
