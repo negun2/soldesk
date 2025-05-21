@@ -39,15 +39,27 @@
 
 
     - name: Include RedHat variables
-      include_vars: "{{ downloaded_vars_dir }}/RedHat.yml" # /root/downloaded_vars/RedHat.yml
+      include_vars:
+        file: "{{ downloaded_vars_dir }}/RedHat.yml" # file 파라미터 사용
       when: ansible_os_family == "RedHat"
-      #ignore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
+      # ignore_errors: yes # 파일이 GitHub에 확실히 있다면 제거
+
+    - name: Check Debian.yml status before include
+      stat:
+        path: "{{ downloaded_vars_dir }}/Debian.yml"
+      register: debian_yml_stat
+      when: ansible_os_family == "Debian"
+
+    - name: Show Debian.yml stat
+      debug:
+        var: debian_yml_stat
+      when: ansible_os_family == "Debian"
 
     - name: Include Debian variables
-      include_vars: "{{ downloaded_vars_dir }}/Debian.yml" # /root/downloaded_vars/Debian.yml
+      include_vars:
+        file: "{{ downloaded_vars_dir }}/Debian.yml" # file 파라미터 사용
       when: ansible_os_family == "Debian"
-      #ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
-
+      # ignore_errors: yes # 파일이 GitHub에 확실히 있다면 제거
     - name: Verify loaded Debian variables
       debug:
         msg:
