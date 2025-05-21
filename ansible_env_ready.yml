@@ -13,7 +13,7 @@
     sqlite_install_prefix: "/usr/local"
 
     # OS별 변수 파일 다운로드 URL 및 경로
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
+    os_vars_base_url: "https://github.com/negun2/soldesk/blob/main/vars"
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
     # OS별 변수 기본값 (로드 실패 대비)
