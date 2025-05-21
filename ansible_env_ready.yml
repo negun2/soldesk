@@ -16,17 +16,7 @@
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
-    # OS별 변수 기본값 (로드 실패 대비)
-    apache_package_name: ""
-    apache_dev_package_name: ""
-    mod_wsgi_package_name_system: "" # 시스템 레벨 Apache 모듈용 (OS별 vars에서 정의)
-    python_virtualenv_package_name: ""
-    python_dev_package_name: ""
-    readline_dev_package_name: ""
-    zlib_dev_package_name: ""
-    libffi_dev_package_name: ""
-    libssl_dev_package_name: ""
-    policycoreutils_package_name: "" # SELinux/AppArmor 관련 유틸리티
+
 
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 이 경로는 /root/downloaded_vars 가 됨
 
