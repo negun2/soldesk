@@ -1,0 +1,243 @@
+# ansible_env_ready.yml
+---
+- name: Setup Base System and Dependencies
+  hosts: localhost
+  gather_facts: yes # gather_facts를 yes로 변경하여 ansible_processor_nproc 사용
+  become: yes
+
+  vars:
+    sqlite_version_major_minor: "3.49.2" # 예시, 실제 다운로드할 버전과 맞추세요
+    sqlite_version_full: "3.49.2"    # 예시
+    #sqlite_download_url: "https://www.sqlite.org/snapshot/sqlite-snapshot-202505171106.tar.gz"
+    sqlite_vm_source_path: "/home/vagrant/sqlite-snapshot-202505171106.tar.gz" # Vagrantfile에서 복사한 경로
+    sqlite_source_file: "sqlite-snapshot-202505171106.tar.gz"
+    sqlite_install_prefix: "/usr/local"
+
+  tasks:
+    - name: Install base packages
+      yum:
+        name:
+          - epel-release
+          - python3
+          - python3-pip
+          - gcc
+          - python3-devel
+          - httpd
+          - httpd-devel
+          - python3-virtualenv # 또는 python3-venv
+          - wget # SQLite 다운로드 시 필요
+          # SQLite 컴파일에 필요한 개발 도구 (groupinstall은 별도 task로)
+          - readline-devel
+          - zlib-devel
+          - libffi-devel
+          - openssl-devel
+        state: present
+
+    - name: Install 'Development Tools' group
+      yum:
+        name: "@Development Tools"
+        state: present
+
+    - name: Create extraction directory for SQLite
+      file:
+        path: /tmp/sqlite_extracted # 이전과 다른 이름 사용 또는 같은 이름 사용 후 unarchive에서 clean=yes
+        state: directory
+        mode: '0755'
+
+    - name: Unarchive SQLite source from VM path
+      unarchive:
+        src: "{{ sqlite_vm_source_path }}" # VM에 이미 복사된 파일의 절대 경로 사용
+        dest: /tmp/sqlite_extracted
+        remote_src: yes # VM 내의 파일을 압축 해제
+      register: sqlite_unarchive_result
+
+    - name: Configure SQLite
+      command: "./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5"
+      args:
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+      changed_when: false
+
+    - name: Compile SQLite
+      command: "make -j{{ ansible_processor_vcpus | default(1) }}"
+      args:
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+      changed_when: false
+
+    - name: Install SQLite
+      command: "make install"
+      args:
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+
+    - name: Configure dynamic linker run-time bindings for SQLite
+      copy:
+        content: "{{ sqlite_install_prefix }}/lib"
+        dest: /etc/ld.so.conf.d/sqlite3-custom.conf
+        mode: '0644'
+      notify: Run ldconfig # 핸들러는 해당 플레이 내에 정의되어야 함      
+
+    - name: Clean up SQLite extracted directory
+      file:
+        path: /tmp/sqlite_extracted
+        state: absent
+
+  handlers: # 이 플레이 내부에 핸들러 정의
+    - name: Run ldconfig
+      command: ldconfig
+
+- name: Setup Django Web Environment
+  hosts: localhost
+  become: yes # 대부분의 작업에 루트 권한 필요
+  #vars_files: # 이전 플레이에서 정의한 변수들을 여기서도 사용 가능
+  #  - ansible_env_ready.yml # 자신을 참조 (또는 별도 vars 파일 사용)
+  vars:
+    project_root_dir: "/home/vagrant/onpremweb"
+    venv_dir: "{{ project_root_dir }}/venv"
+    django_project_name: "onpremweb" # 로그 파일명 등에 사용
+    django_project_config_name: "onprem_project_config"
+    django_version: "3.2.25"
+    # Apache 관련 변수
+    apache_user: "apache"
+    apache_group: "apache"
+    apache_wsgi_daemon_name: "onpremweb_daemon"
+    server_name_ip: "localhost" # Vagrant IP
+    server_alias_domain: "your_actual_domain.com" # 실제 도메인이 있다면 설정
+    apache_conf_template_vm_src_path: "/home/vagrant/django_onpremweb.conf.j2"    
+
+  tasks:
+    - name: Ensure project directory exists
+      file:
+        path: "{{ project_root_dir }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+
+    - name: Create Python virtual environment
+      command: "python3 -m venv {{ venv_dir }}"
+      args:
+        creates: "{{ venv_dir }}/bin/activate"
+      become_user: vagrant
+
+    - name: Install Django and mod_wsgi in virtual environment
+      pip:
+        name:
+          - "django=={{ django_version }}"
+          - mod_wsgi
+        virtualenv: "{{ venv_dir }}"
+        virtualenv_python: python3
+      become_user: vagrant
+
+    - name: Ensure mod_wsgi module is configured to load in Apache
+      copy:
+        content: "LoadModule wsgi_module modules/mod_wsgi_python3.so\n"
+        dest: /etc/httpd/conf.modules.d/10-wsgi.conf # 또는 적절한 파일명
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart httpd # 핸들러 이름은 플레이북에 정의된 대로
+
+    - name: Create Django project
+      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} {{ project_root_dir }}"
+      args:
+        creates: "{{ project_root_dir }}/manage.py"
+      become_user: vagrant
+
+    - name: Configure Django settings
+      lineinfile:
+        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        insertafter: "{{ item.insertafter | default('^# Application definition') }}" # 기본값 설정
+        create: yes
+      loop:
+        - { regexp: "^STATIC_URL = .*", line: "STATIC_URL = '/static/'", insertafter: "^BASE_DIR = .*" }
+        - { regexp: "^STATIC_ROOT = .*", line: "STATIC_ROOT = BASE_DIR / 'staticfiles'", insertafter: "^BASE_DIR = .*" }
+        - { regexp: "^MEDIA_URL = .*", line: "MEDIA_URL = '/media/'", insertafter: "^BASE_DIR = .*" }
+        - { regexp: "^MEDIA_ROOT = .*", line: "MEDIA_ROOT = BASE_DIR / 'mediafiles'", insertafter: "^BASE_DIR = .*" }
+        - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
+        - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" } # os 모듈 import 추가
+
+    - name: Create staticfiles and mediafiles directories
+      file:
+        path: "{{ project_root_dir }}/{{ item }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+      loop:
+        - staticfiles
+        - mediafiles
+      become_user: vagrant
+
+    - name: Collect static files
+      command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
+      become_user: vagrant
+      args:
+        chdir: "{{ project_root_dir }}"
+
+    - name: Set permissions for project directory for Apache
+      file:
+        path: "{{ item }}"
+        owner: vagrant
+        group: "{{ apache_group }}"
+        mode: "{{ 'g+rX' if item == project_root_dir else '0775' }}" # 프로젝트 루트는 g+rX, 하위는 0775
+        recurse: "{{ 'yes' if item != project_root_dir else 'no' }}" # 하위 디렉토리 권한 재귀 설정
+      loop:
+        - "{{ project_root_dir }}" # 프로젝트 루트 디렉토리
+        - "{{ project_root_dir }}/staticfiles"
+        - "{{ project_root_dir }}/mediafiles"
+        - "{{ venv_dir }}" # 가상환경 디렉토리도 apache가 접근 가능해야 할 수 있음
+
+    - name: Allow Apache to search user's home directory
+      file:
+        path: /home/vagrant
+        mode: '0711'
+      changed_when: false # 항상 실행되지만 상태 변경은 아님 (멱등성)
+
+    - name: Deploy Apache virtual host configuration for Django
+      template:
+        src: "{{ apache_conf_template_vm_src_path }}"
+        dest: "/etc/httpd/conf.d/{{ django_project_name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart httpd
+
+    - name: Ensure httpd service is enabled and running
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    # SELinux 설정 (필요시, 더 구체적인 정책 필요할 수 있음)
+    # - name: Allow httpd to access project files (SELinux)
+    #   sefcontext:
+    #     target: "{{ project_root_dir }}(/.*)?"
+    #     setype: httpd_sys_content_t
+    #     state: present
+    #   notify: Restore SELinux context
+
+    - name: Ensure firewalld is running and http port is open
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      notify: Reload firewalld
+      # ignore_errors: yes # firewalld가 없을 수도 있는 환경 대비 (Vagrant에는 보통 있음)
+
+  handlers:
+    - name: Restart httpd Handler
+      service:
+        name: httpd
+        state: restarted
+      listen: "Restart httpd"
+
+    # - name: Restore SELinux context
+    #   command: "restorecon -Rv {{ project_root_dir }}"
+    #   listen: "Restore SELinux context"
+
+    - name: Reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+      listen: "Reload firewalld"
