@@ -36,48 +36,37 @@
       ignore_errors: yes # 특정 파일이 없을 경우 대비
 
 
-    - name: Include RedHat variables
-      include_vars:
-        file: "{{ downloaded_vars_dir }}/RedHat.yml" # file 파라미터 사용
+    # --- 변수 로드 방식을 slurp + set_fact으로 변경 ---
+    - name: Read RedHat vars file content
+      slurp:
+        src: "{{ downloaded_vars_dir }}/RedHat.yml"
+      register: redhat_vars_file_b64
       when: ansible_os_family == "RedHat"
-      # ignore_errors: yes # 파일이 GitHub에 확실히 있다면 제거
-
-    - name: Check Debian.yml status before include
-      stat:
-        path: "{{ downloaded_vars_dir }}/Debian.yml"
-      register: debian_yml_stat
-      when: ansible_os_family == "Debian"
-
-    - name: Show Debian.yml stat
-      debug:
-        var: debian_yml_stat
-      when: ansible_os_family == "Debian"
-
-    - name: Include Debian variables
-      include_vars:
-        file: "{{ downloaded_vars_dir }}/Debian.yml" # file 파라미터 사용
-      when: ansible_os_family == "Debian"
-      # ignore_errors: yes # 파일이 GitHub에 확실히 있다면 제거
-    - name: Verify loaded Debian variables
-      debug:
-        msg:
-          - "OS Family: {{ ansible_os_family }}"
-          - "Python Dev Pkg (after include): {{ python_dev_package_name | default('NOT DEFINED IN CURRENT SCOPE') }}"
-          - "Apache Pkg (after include): {{ apache_package_name | default('NOT DEFINED IN CURRENT SCOPE') }}"
-          # ... (확인하고 싶은 다른 주요 변수들) ...
-      when: ansible_os_family == "Debian"
-
-    - name: Display content of downloaded Debian.yml for debugging
-      command: "cat {{ downloaded_vars_dir }}/Debian.yml"
-      register: debian_vars_content
-      when: ansible_os_family == "Debian"
-      changed_when: false # 상태 변경 안 함
       ignore_errors: yes # 파일이 없을 경우 대비
 
-    - name: Show downloaded Debian.yml content
-      debug:
-        var: debian_vars_content.stdout_lines
-      when: ansible_os_family == "Debian" and debian_vars_content.stdout is defined
+    - name: Set facts from RedHat vars file
+      set_fact:
+        # b64decode로 디코딩 후 from_yaml로 파싱
+        # update_vars를 사용하여 기존 변수와 병합 (또는 os_vars 와 같이 새로운 변수로 그룹화)
+        # 여기서는 직접 변수 공간에 등록
+        "{{ item.key }}": "{{ item.value }}"
+      loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml) | dict2items }}"
+      when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined
+      no_log: true # 변수 내용이 로그에 많이 남지 않도록
+
+    - name: Read Debian vars file content
+      slurp:
+        src: "{{ downloaded_vars_dir }}/Debian.yml"
+      register: debian_vars_file_b64
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Set facts from Debian vars file
+      set_fact:
+        "{{ item.key }}": "{{ item.value }}"
+      loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml) | dict2items }}"
+      when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined
+      no_log: true
 
     # --- RedHat 계열 패키지 설치 ---
     - name: Install base packages (RedHat family)
