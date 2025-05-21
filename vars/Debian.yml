@@ -1,26 +1,19 @@
 # vars/Debian.yml
-
-# --- Play 1: Setup Base System and Dependencies (Multi-OS) ---
-# "Install base packages (Debian family)" 태스크에서 사용될 패키지 이름들
 python_dev_package_name: "python3-dev"
 apache_package_name: "apache2"
 apache_dev_package_name: "apache2-dev"
-mod_wsgi_package_name_system: "libapache2-mod-wsgi-py3" # Python 3용 mod_wsgi
-python_virtualenv_package_name: "python3-venv" # Ubuntu 20.04+ 표준
+mod_wsgi_package_name_system: "libapache2-mod-wsgi-py3"
+python_virtualenv_package_name: "python3-venv"
 readline_dev_package_name: "libreadline-dev"
 zlib_dev_package_name: "zlib1g-dev"
 libffi_dev_package_name: "libffi-dev"
 libssl_dev_package_name: "libssl-dev"
-policycoreutils_package_name: "python3-policycoreutils" # sefcontext 모듈 등 SELinux 유틸리티 (AppArmor 환경에서는 다른 접근 필요할 수 있음)
+policycoreutils_package_name: "python3-policycoreutils" # 또는 필요한 다른 패키지
 
-# --- Play 2: Setup Django Web Environment (Multi-OS) ---
-# Django 환경 설정에 필요한 OS별 값들
+# Django 플레이용 변수들
 apache_user: "www-data"
 apache_group: "www-data"
-apache_conf_dir: "/etc/apache2/sites-available" # Apache 가상 호스트 설정 파일 디렉토리
-apache_sites_enabled_dir: "/etc/apache2/sites-enabled" # 활성화된 사이트 심볼릭 링크 디렉토리
-apache_service_name: "apache2" # Apache 서비스 이름
-mod_wsgi_load_file_content_django: "" # Debian/Ubuntu에서는 libapache2-mod-wsgi-py3 패키지 설치 시
-                                   # 보통 자동으로 /etc/apache2/mods-available/wsgi_py3.load (또는 wsgi.load) 파일이 생성되고
-                                   # a2enmod 명령으로 활성화하므로, 이 변수는 빈 값으로 두거나 사용하지 않을 수 있음.
-                                   # 플레이북의 "Enable wsgi module on Debian family" 태스크가 a2enmod를 사용.
+apache_conf_dir: "/etc/apache2/sites-available"
+apache_sites_enabled_dir: "/etc/apache2/sites-enabled"
+apache_service_name: "apache2"
+mod_wsgi_load_file_content_django: "" # Debian에서는 보통 불필요
