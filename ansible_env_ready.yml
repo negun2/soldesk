@@ -41,12 +41,12 @@
     - name: Include RedHat variables
       include_vars: "{{ downloaded_vars_dir }}/RedHat.yml" # /root/downloaded_vars/RedHat.yml
       when: ansible_os_family == "RedHat"
-      ignore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
+      #ignore_errors: yes # 파일이 없을 경우 대비 (하지만 GitHub에 있어야 함)
 
     - name: Include Debian variables
       include_vars: "{{ downloaded_vars_dir }}/Debian.yml" # /root/downloaded_vars/Debian.yml
       when: ansible_os_family == "Debian"
-      ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
+      #ignore_errors: yes # 파일이 없을 경우 대비 (GitHub에 있어야 함)
 
     - name: Display content of downloaded Debian.yml for debugging
       command: "cat {{ downloaded_vars_dir }}/Debian.yml"
