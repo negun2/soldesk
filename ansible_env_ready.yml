@@ -14,7 +14,7 @@
 
     # OS별 변수 파일 다운로드 URL 및 경로
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars_play1"
 
   tasks:
     - name: Create directory for downloaded OS vars files
@@ -179,29 +179,35 @@
     - name: Run ldconfig
       command: ldconfig
 
-# --- 다음 플레이 ---
+# --- 두 번째 플레이: Setup Django Web Environment (Multi-OS) ---
 - name: Setup Django Web Environment (Multi-OS)
   hosts: localhost
   become: yes
   gather_facts: yes
 
   vars:
-    # 공통 변수
-    target_user_home: "{{ ansible_user_dir | default('/home/vagrant') }}"
+    # 공통 변수 (target_user_home, project_root_dir 등)
+    target_user_home: "{{ ansible_user_dir | default('/home/vagrant') }}/onpremweb_user" # 사용자 홈 디렉토리 변수명 명확화
     target_user: "{{ ansible_user_id | default('vagrant') }}"
-    project_root_dir: "{{ target_user_home }}/onpremweb"
+    project_root_dir: "{{ target_user_home }}" # 프로젝트 루트를 사용자 홈으로 변경
     venv_dir: "{{ project_root_dir }}/venv"
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
 
+
+       # OS별 변수 파일 다운로드 및 로드 (이 플레이에서도 별도로 vars 파일 로드)
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
+    # downloaded_vars_dir_play2: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars_play2"
 
     apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
     apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
-    ansible_playbook_dir: "{{ target_user_home }}" # 플레이북이 다운로드된 경로
+    ansible_playbook_dir: "{{ ansible_user_dir | default('/home/vagrant') }}" # 플레이북 다운로드된 경로
     vm_templates_dir: "{{ ansible_playbook_dir }}/templates_downloaded"
+
+    # !!! apache_wsgi_daemon_name 변수를 이 플레이의 vars 섹션에 명시적으로 정의 !!!
+    apache_wsgi_daemon_name: "onpremweb_daemon"
+    # OS별 apache_user, apache_group 등은 vars/*.yml 에서 가져옴
 
     # OS별 변수 기본값 (로드 실패 대비)
     apache_user: ""
@@ -212,20 +218,14 @@
     mod_wsgi_load_file_content_django: "" # Django 플레이용 mod_wsgi 로드 내용 (OS별 vars_django에서 정의)
 
   tasks:
-    - name: Ensure downloaded_vars_dir exists (for idempotency)
-      file:
-        path: "{{ downloaded_vars_dir }}"
-        state: directory
-        mode: '0755'
-      changed_when: false # 이미 생성되었을 가능성이 높음
 
-    - name: Include OS-specific variables for Django environment from downloaded files
-      include_vars: "{{ item }}"
-      with_first_found:
-        - files:
-            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}_django.yml" # 예: RedHat_django.yml (만약 있다면)
-            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"      # 또는 일반 OS별 파일
-          skip: true
+    - name: Include OS-specific variables for Django (using Play1's downloaded files)
+      include_vars:
+        # dir 옵션 대신 file 옵션과 files_matching 사용
+        file: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars/{{ ansible_os_family }}.yml"
+        # 또는 dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
+        #      files_matching: "{{ ansible_os_family }}.yml"
+      ignore_errors: yes # 파일이 없을 경우 대비
 
     - name: Ensure project directory exists
       file:
@@ -330,6 +330,25 @@
       become_user: "{{ target_user }}"
       args:
         chdir: "{{ project_root_dir }}"
+
+    - name: Debug key variables before Apache conf deployment
+      debug:
+        msg:
+          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
+          - "apache_user: {{ apache_user | default('NOT DEFINED FROM VARS FILE') }}"
+          - "apache_group: {{ apache_group | default('NOT DEFINED FROM VARS FILE') }}"
+          - "venv_dir: {{ venv_dir }}"
+          - "project_root_dir: {{ project_root_dir }}"
+          - "django_project_config_name: {{ django_project_config_name }}"
+
+    - name: Deploy Apache virtual host configuration for Django
+      template:
+        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Apache
 
     - name: Set permissions for project directory for Apache
       file:
