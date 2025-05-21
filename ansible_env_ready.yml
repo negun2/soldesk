@@ -1,122 +1,254 @@
 # ansible_env_ready.yml
 ---
-- name: Setup Base System and Dependencies
+- name: Setup Base System and Dependencies (Multi-OS)
   hosts: localhost
   gather_facts: yes # gather_facts를 yes로 변경하여 ansible_processor_nproc 사용
   become: yes
 
   vars:
-    sqlite_version_major_minor: "3.49.2" # 예시, 실제 다운로드할 버전과 맞추세요
-    sqlite_version_full: "3.49.2"    # 예시
-    #sqlite_download_url: "https://www.sqlite.org/snapshot/sqlite-snapshot-202505171106.tar.gz"
-    sqlite_vm_source_path: "/home/vagrant/sqlite-snapshot-202505171106.tar.gz" # Vagrantfile에서 복사한 경로
-    sqlite_source_file: "sqlite-snapshot-202505171106.tar.gz"
+    # 공통 변수
+    sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
+    sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
+    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
     sqlite_install_prefix: "/usr/local"
 
+    # OS별 변수 파일 다운로드 URL 및 경로
+    # GitHub 저장소의 vars 디렉토리 구조에 맞게 URL 수정
+    # 예: https://raw.githubusercontent.com/<username>/<repo>/<branch>/vars/RedHat.yml
+    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars" # vars 디렉토리까지의 기본 URL
+    # target_user_home은 Ansible 실행 사용자의 홈 디렉토리 (예: /home/vagrant)
+    # 플레이북 실행 경로를 기준으로 vars 디렉토리를 만들고 그 안에 다운로드
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
+
+    # OS별 변수 기본값 (아래 include_vars에서 덮어쓰여질 수 있음)
+    apache_package_name: ""
+    apache_dev_package_name: ""
+    mod_wsgi_package_name: ""
+    python_virtualenv_package_name: ""
+    python_dev_package_name: ""
+    readline_dev_package_name: ""
+    zlib_dev_package_name: ""
+    libffi_dev_package_name: ""
+    libssl_dev_package_name: ""
+    policycoreutils_package_name: "" # SELinux/AppArmor 관련
+
   tasks:
-    - name: Install base packages
-      yum:
-        name:
-          - epel-release
-          - python3
-          - python3-pip
-          - gcc
-          - python3-devel
-          - httpd
-          - httpd-devel
-          - python3-virtualenv # 또는 python3-venv
-          - wget # SQLite 다운로드 시 필요
-          # SQLite 컴파일에 필요한 개발 도구 (groupinstall은 별도 task로)
-          - readline-devel
-          - zlib-devel
-          - libffi-devel
-          - openssl-devel
-        state: present
-
-    - name: Install 'Development Tools' group
-      yum:
-        name: "@Development Tools"
-        state: present
-
-    - name: Create extraction directory for SQLite
+    - name: Create directory for downloaded OS vars files
       file:
-        path: /tmp/sqlite_extracted # 이전과 다른 이름 사용 또는 같은 이름 사용 후 unarchive에서 clean=yes
+        path: "{{ downloaded_vars_dir }}"
         state: directory
         mode: '0755'
 
-    - name: Unarchive SQLite source from VM path
+    - name: Download OS-specific var files from GitHub
+      get_url:
+        url: "{{ os_vars_base_url }}/{{ item }}" # item은 RedHat.yml 또는 Debian.yml
+        dest: "{{ downloaded_vars_dir }}/{{ item }}"
+        mode: '0644'
+      loop: # 다운로드할 파일 목록
+        - "RedHat.yml"
+        - "Debian.yml"
+        # - "RedHat_django.yml" # 만약 Django용 vars 파일도 별도로 있다면 추가
+        # - "Debian_django.yml"
+        # - "default.yml" # 기본값 파일도 다운로드하려면 추가
+      ignore_errors: yes # 특정 OS 변수 파일이 없을 수도 있으므로 오류 무시 (아래 include_vars에서 처리)
+
+    - name: Include OS-specific variables from downloaded files
+      include_vars: "{{ item }}"
+      with_first_found:
+        - files:
+            # VM 내부에 다운로드된 경로에서 OS별 vars 파일 로드 시도
+            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
+            # Django 환경용 OS별 vars 파일 (만약 분리했다면)
+            # - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}_django.yml"
+            # 기본값 파일 (만약 있다면)
+            # - "{{ downloaded_vars_dir }}/default.yml"
+          skip: true # 파일이 없어도 오류 발생 안 함 (vars 섹션의 기본값 사용)
+      # when: item is file # 파일 존재 여부 확인 후 include (더 안전)
+
+    # ... (이후 "Install base packages" 부터의 태스크들은 이전과 거의 동일하게 유지) ...
+    # 단, 패키지명 등은 다운로드된 OS별 vars 파일의 변수를 사용하게 됨
+
+    # --- RedHat 계열 패키지 설치 ---
+    - name: Install base packages (RedHat family)
+      yum:
+        name:
+          - epel-release # EPEL은 RedHat에서만
+          - python3
+          - python3-pip
+          - gcc
+          - "{{ python_dev_package_name }}"
+          - "{{ apache_package_name }}"
+          - "{{ apache_dev_package_name }}"
+          - "{{ mod_wsgi_package_name }}" # RedHat용 mod_wsgi 패키지명
+          - "{{ python_virtualenv_package_name }}"
+          - wget
+          - "{{ readline_dev_package_name }}"
+          - "{{ zlib_dev_package_name }}"
+          - "{{ libffi_dev_package_name }}"
+          - "{{ libssl_dev_package_name }}"
+          # - "{{ policycoreutils_package_name }}" # 필요시
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # --- Debian 계열 패키지 설치 ---
+    - name: Install base packages (Debian family)
+      apt:
+        name:
+          # Debian/Ubuntu에는 epel-release 없음
+          - python3
+          - python3-pip
+          - gcc
+          - "{{ python_dev_package_name }}" # Debian용 python3-dev 등
+          - "{{ apache_package_name }}"    # Debian용 apache2 등
+          - "{{ apache_dev_package_name }}" # Debian용 apache2-dev 등
+          - "{{ mod_wsgi_package_name }}"   # Debian용 libapache2-mod-wsgi-py3 등
+          - "{{ python_virtualenv_package_name }}" # Debian용 python3-venv 등
+          - wget
+          - "{{ readline_dev_package_name }}" # Debian용 libreadline-dev 등
+          - "{{ zlib_dev_package_name }}"     # Debian용 zlib1g-dev 등
+          - "{{ libffi_dev_package_name }}"   # Debian용 libffi-dev 등
+          - "{{ libssl_dev_package_name }}"   # Debian용 libssl-dev 등
+          - "{{ policycoreutils_package_name | default(omit) }}" # Ubuntu용 AppArmor/SELinux 유틸 (없으면 생략)
+        state: present
+        update_cache: yes # apt update 실행
+      when: ansible_os_family == "Debian"
+
+    - name: Install 'Development Tools' group (RedHat family only)
+      yum:
+        name: "@Development Tools"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install 'build-essential' (Debian family for development tools)
+      apt:
+        name: build-essential
+        state: present
+      when: ansible_os_family == "Debian"
+
+
+    - name: Create download and extraction directory for SQLite
+      file:
+        path: "{{ sqlite_download_dest_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download SQLite source from GitHub
+      get_url:
+        url: "{{ sqlite_download_url }}"
+        dest: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
+        mode: '0644'
+      register: sqlite_download_status
+      until: sqlite_download_status is succeeded # 다운로드 성공할 때까지 재시도 (선택 사항)
+      retries: 3 # 최대 3번 재시도 (선택 사항)
+      delay: 5   # 재시도 간 5초 대기 (선택 사항)
+
+    - name: Unarchive SQLite source
       unarchive:
-        src: "{{ sqlite_vm_source_path }}" # VM에 이미 복사된 파일의 절대 경로 사용
-        dest: /tmp/sqlite_extracted
-        remote_src: yes # VM 내의 파일을 압축 해제
+        src: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
+        dest: "{{ sqlite_download_dest_dir }}" # 같은 디렉토리에 압축 해제
+        remote_src: yes
       register: sqlite_unarchive_result
 
     - name: Configure SQLite
       command: "./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5"
       args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
       changed_when: false
 
     - name: Compile SQLite
       command: "make -j{{ ansible_processor_vcpus | default(1) }}"
       args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
       changed_when: false
 
     - name: Install SQLite
       command: "make install"
       args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_vm_source_path | basename | regex_replace('.tar.gz$', '') }}"
+        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
 
     - name: Configure dynamic linker run-time bindings for SQLite
       copy:
         content: "{{ sqlite_install_prefix }}/lib"
         dest: /etc/ld.so.conf.d/sqlite3-custom.conf
         mode: '0644'
-      notify: Run ldconfig # 핸들러는 해당 플레이 내에 정의되어야 함      
+      notify: Run ldconfig
 
-    - name: Clean up SQLite extracted directory
+    - name: Clean up SQLite download and extraction directory
       file:
-        path: /tmp/sqlite_extracted
+        path: "{{ sqlite_download_dest_dir }}"
         state: absent
 
-  handlers: # 이 플레이 내부에 핸들러 정의
+  handlers:
     - name: Run ldconfig
       command: ldconfig
 
-- name: Setup Django Web Environment
+# --- 다음 플레이 ---
+- name: Setup Django Web Environment (Multi-OS)
   hosts: localhost
-  become: yes # 대부분의 작업에 루트 권한 필요
-  #vars_files: # 이전 플레이에서 정의한 변수들을 여기서도 사용 가능
-  #  - ansible_env_ready.yml # 자신을 참조 (또는 별도 vars 파일 사용)
+  become: yes
+  gather_facts: yes
+
   vars:
-    project_root_dir: "/home/vagrant/onpremweb"
+    # 공통 변수
+    target_user_home: "{{ ansible_user_dir | default('/home/vagrant') }}"
+    target_user: "{{ ansible_user_id | default('vagrant') }}"
+    project_root_dir: "{{ target_user_home }}/onpremweb"
     venv_dir: "{{ project_root_dir }}/venv"
-    django_project_name: "onpremweb" # 로그 파일명 등에 사용
+    django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
-    # Apache 관련 변수
-    apache_user: "apache"
-    apache_group: "apache"
-    apache_wsgi_daemon_name: "onpremweb_daemon"
-    server_name_ip: "localhost" # Vagrant IP
-    server_alias_domain: "your_actual_domain.com" # 실제 도메인이 있다면 설정
-    apache_conf_template_vm_src_path: "/home/vagrant/django_onpremweb.conf.j2"    
+
+    # OS별 변수 파일 다운로드 및 로드 (첫 번째 플레이와 동일한 방식)
+    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일한 경로 사용
+
+    # Apache 템플릿 다운로드 관련 (이전과 동일)
+    apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
+    apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
+    ansible_playbook_dir: "{{ target_user_home }}"
+    vm_templates_dir: "{{ ansible_playbook_dir }}/templates_downloaded"
+
+    # OS별 변수 기본값 (아래 include_vars에서 덮어쓰여질 수 있음)
+    apache_user: ""
+    apache_group: ""
+    apache_conf_dir: ""
+    apache_sites_enabled_dir: "" # Debian 계열에서만 사용
+    apache_service_name: ""
+    mod_wsgi_load_file_content: "" # OS별 LoadModule 내용
 
   tasks:
+    - name: Ensure downloaded_vars_dir exists (for idempotency if first play was skipped)
+      file:
+        path: "{{ downloaded_vars_dir }}"
+        state: directory
+        mode: '0755'
+      # 이 태스크는 첫 번째 플레이에서 이미 생성했으므로, 없어도 되거나 changed_when: false 추가 가능
+
+    - name: Include OS-specific variables for Django environment from downloaded files
+      include_vars: "{{ item }}"
+      with_first_found:
+        - files:
+            # VM 내부에 다운로드된 경로에서 OS별 vars 파일 로드 시도
+            # Django 환경 전용 OS별 변수 파일이 있다면 그것을 우선 로드
+            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}_django.yml" # 예: RedHat_django.yml
+            - "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"      # 또는 일반 OS별 파일
+            # - "{{ downloaded_vars_dir }}/default_django.yml"
+            # - "{{ downloaded_vars_dir }}/default.yml"
+          skip: true
+
     - name: Ensure project directory exists
       file:
         path: "{{ project_root_dir }}"
         state: directory
-        owner: vagrant
-        group: vagrant
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
         mode: '0755'
 
     - name: Create Python virtual environment
       command: "python3 -m venv {{ venv_dir }}"
       args:
         creates: "{{ venv_dir }}/bin/activate"
-      become_user: vagrant
+      become_user: "{{ target_user }}"
 
     - name: Install Django and mod_wsgi in virtual environment
       pip:
@@ -125,22 +257,35 @@
           - mod_wsgi
         virtualenv: "{{ venv_dir }}"
         virtualenv_python: python3
-      become_user: vagrant
+      become_user: "{{ target_user }}"
 
     - name: Ensure mod_wsgi module is configured to load in Apache
       copy:
-        content: "LoadModule wsgi_module modules/mod_wsgi_python3.so\n"
-        dest: /etc/httpd/conf.modules.d/10-wsgi.conf # 또는 적절한 파일명
+        content: "{{ mod_wsgi_load_file_content }}" # OS별 변수 사용
+        dest: "{{ item }}" # OS별 경로 사용 (아래 with_items + when)
         owner: root
         group: root
         mode: '0644'
-      notify: Restart httpd # 핸들러 이름은 플레이북에 정의된 대로
+      with_items:
+        - "/etc/httpd/conf.modules.d/10-wsgi.conf" # RedHat
+        - "/etc/apache2/mods-available/wsgi.load" # Debian (실제로는 python3-libapache2-mod-wsgi 패키지가 처리)
+      when: ansible_os_family == "RedHat" and item == "/etc/httpd/conf.modules.d/10-wsgi.conf"
+      # Debian/Ubuntu에서는 a2enmod 사용 (별도 태스크)
+      notify: Restart httpd
+      ignore_errors: yes # Debian에서 수동 설정 불필요 시 오류 방지
+
+    - name: Enable wsgi module on Debian family
+      command: "a2enmod wsgi_py3" # 또는 wsgi, 실제 모듈명 확인 필요
+      args:
+        creates: "/etc/apache2/mods-enabled/wsgi_py3.load" # 또는 wsgi.load
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache
 
     - name: Create Django project
       command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} {{ project_root_dir }}"
       args:
         creates: "{{ project_root_dir }}/manage.py"
-      become_user: vagrant
+      become_user: "{{ target_user }}"
 
     - name: Configure Django settings
       lineinfile:
@@ -161,24 +306,24 @@
       file:
         path: "{{ project_root_dir }}/{{ item }}"
         state: directory
-        owner: vagrant
-        group: vagrant
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
         mode: '0755'
       loop:
         - staticfiles
         - mediafiles
-      become_user: vagrant
+      become_user: "{{ target_user }}"
 
     - name: Collect static files
       command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
-      become_user: vagrant
+      become_user: "{{ target_user }}"
       args:
         chdir: "{{ project_root_dir }}"
 
     - name: Set permissions for project directory for Apache
       file:
         path: "{{ item }}"
-        owner: vagrant
+        owner: "{{ target_user }}"
         group: "{{ apache_group }}"
         mode: "{{ 'g+rX' if item == project_root_dir else '0775' }}" # 프로젝트 루트는 g+rX, 하위는 0775
         recurse: "{{ 'yes' if item != project_root_dir else 'no' }}" # 하위 디렉토리 권한 재귀 설정
@@ -190,54 +335,106 @@
 
     - name: Allow Apache to search user's home directory
       file:
-        path: /home/vagrant
-        mode: '0711'
-      changed_when: false # 항상 실행되지만 상태 변경은 아님 (멱등성)
+        path: "{{ target_user_home }}"
+        mode: '0755'
+
+    - name: Create directory for downloaded Apache template on VM
+      file:
+        path: "{{ vm_templates_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Apache config template from GitHub
+      get_url:
+        url: "{{ apache_conf_template_download_url }}"
+        dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+        mode: '0644'
 
     - name: Deploy Apache virtual host configuration for Django
       template:
-        src: "{{ apache_conf_template_vm_src_path }}"
-        dest: "/etc/httpd/conf.d/{{ django_project_name }}.conf"
+        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}" # VM 내 다운로드된 템플릿 사용
+        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf" # OS별 경로 사용
         owner: root
         group: root
         mode: '0644'
-      notify: Restart httpd
+      notify: Restart Apache
 
-    - name: Ensure httpd service is enabled and running
+    - name: Clean up downloaded Apache template directory on VM
+      file:
+        path: "{{ vm_templates_dir }}"
+        state: absent
+
+    - name: Enable Apache site (Debian family only)
+      command: "a2ensite {{ django_project_name }}"
+      args:
+        creates: "{{ apache_sites_enabled_dir }}/{{ django_project_name }}.conf"
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache
+
+    - name: Ensure Apache service is enabled and running
       service:
-        name: httpd
+        name: "{{ apache_service_name }}" # OS별 서비스 이름 사용
         state: started
         enabled: yes
 
-    # SELinux 설정 (필요시, 더 구체적인 정책 필요할 수 있음)
-    # - name: Allow httpd to access project files (SELinux)
-    #   sefcontext:
-    #     target: "{{ project_root_dir }}(/.*)?"
-    #     setype: httpd_sys_content_t
-    #     state: present
-    #   notify: Restore SELinux context
+    # SELinux (RedHat) / AppArmor (Debian) 처리
+    - name: Configure SELinux for Apache (RedHat family only)
+      block:
+        - name: Allow httpd to access project files (SELinux)
+          sefcontext:
+            target: "{{ project_root_dir }}(/.*)?"
+            setype: httpd_sys_content_t # 또는 다른 적절한 컨텍스트
+            state: present
+          notify: Restore SELinux context
 
-    - name: Ensure firewalld is running and http port is open
-      firewalld:
-        service: http
-        permanent: yes
-        state: enabled
-      notify: Reload firewalld
-      # ignore_errors: yes # firewalld가 없을 수도 있는 환경 대비 (Vagrant에는 보통 있음)
+        - name: Allow httpd to access user home directories (SELinux boolean)
+          seboolean:
+            name: httpd_enable_homedirs
+            state: yes
+            persistent: yes
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes # policycoreutils-python 없을 경우 대비
+
+    # AppArmor 설정은 더 복잡하며, 보통 프로필을 수정하거나 disable 해야 할 수 있음
+    # 여기서는 간단히 넘어감
+
+    - name: Ensure firewall is configured for http
+      block:
+        - name: Allow http on firewalld (RedHat family)
+          firewalld:
+            service: http
+            permanent: yes
+            state: enabled
+          notify: Reload firewalld
+          when: ansible_os_family == "RedHat"
+
+        - name: Allow http on ufw (Debian family)
+          ufw:
+            rule: allow
+            port: '80'
+            proto: tcp
+          notify: Reload ufw # ufw reload 핸들러 필요 (또는 service 모듈로 ufw 재시작)
+          when: ansible_os_family == "Debian"
+      ignore_errors: yes # 방화벽이 없거나 다른 방화벽 사용 시
 
   handlers:
-    - name: Restart httpd Handler
+    - name: Restart Apache
       service:
-        name: httpd
+        name: "{{ apache_service_name }}" # OS별 서비스 이름 사용
         state: restarted
-      listen: "Restart httpd"
 
-    # - name: Restore SELinux context
-    #   command: "restorecon -Rv {{ project_root_dir }}"
-    #   listen: "Restore SELinux context"
+    - name: Restore SELinux context
+      command: "restorecon -Rv {{ project_root_dir }}"
+      when: ansible_os_family == "RedHat" # RedHat에서만 실행
 
     - name: Reload firewalld
       service:
         name: firewalld
         state: reloaded
-      listen: "Reload firewalld"
+      when: ansible_os_family == "RedHat"
+
+    # - name: Reload ufw # Debian용 핸들러 (필요시 추가)
+    #   service:
+    #     name: ufw
+    #     state: reloaded
+    #   when: ansible_os_family == "Debian"
