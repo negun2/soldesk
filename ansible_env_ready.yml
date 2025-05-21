@@ -28,6 +28,8 @@
     libssl_dev_package_name: ""
     policycoreutils_package_name: "" # SELinux/AppArmor 관련 유틸리티
 
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 이 경로는 /root/downloaded_vars 가 됨
+
   tasks:
     - name: Create directory for downloaded OS vars files
       file:
@@ -39,12 +41,24 @@
       get_url:
         url: "{{ os_vars_base_url }}/{{ item }}"
         dest: "{{ downloaded_vars_dir }}/{{ item }}"
-        mode: '0644'
+        mode: '0755'
       loop:
         - "RedHat.yml"
         - "Debian.yml"
         # 추가적인 OS별 _django.yml 파일 등을 사용한다면 여기에 추가
       ignore_errors: yes # 특정 파일이 없을 경우 대비
+
+    - name: Display content of downloaded Debian.yml for debugging
+      command: "cat {{ downloaded_vars_dir }}/Debian.yml"
+      register: debian_vars_content
+      when: ansible_os_family == "Debian"
+      changed_when: false # 상태 변경 안 함
+      ignore_errors: yes # 파일이 없을 경우 대비
+
+    - name: Show downloaded Debian.yml content
+      debug:
+        var: debian_vars_content.stdout_lines
+      when: ansible_os_family == "Debian" and debian_vars_content.stdout is defined
 
     - name: Include OS-specific variables from downloaded files
       include_vars: "{{ item }}"
