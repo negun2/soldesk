@@ -86,7 +86,7 @@
           - "{{ zlib_dev_package_name }}"
           - "{{ libffi_dev_package_name }}"
           - "{{ libssl_dev_package_name }}"
-          #- "{{ policycoreutils_package_name | default(omit) }}"
+          - "{{ policycoreutils_package_name | default(omit) }}"
         state: present
       when: ansible_os_family == "RedHat"
 
@@ -107,7 +107,7 @@
           - "{{ zlib_dev_package_name }}"
           - "{{ libffi_dev_package_name }}"
           - "{{ libssl_dev_package_name }}"
-          - "{{ policycoreutils_package_name | default(omit) }}"
+          #- "{{ policycoreutils_package_name | default(omit) }}"
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
