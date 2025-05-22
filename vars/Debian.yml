@@ -26,3 +26,4 @@ apache_conf_dir: "/etc/apache2/sites-available"
 apache_sites_enabled_dir: "/etc/apache2/sites-enabled"
 apache_service_name: "apache2"
 mod_wsgi_load_file_content_django: "" # Debian에서는 패키지가 보통 자동으로 처리
+apache_log_dir: "/var/log/apache2" # Ubuntu/Debian Apache 로그 디렉토리
