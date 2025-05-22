@@ -372,40 +372,25 @@
         dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
-    - name: Slurp downloaded Apache config template content
-      slurp:
-        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}" # /root/templates_downloaded/django_onpremweb.conf.j2
-      register: apache_template_content_b64
-      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat" # 필요한 OS에서만 실행
+    - name: Download Apache config template to /tmp
+      get_url:
+        url: "{{ apache_conf_template_download_url }}"
+        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래로 직접 다운로드
+        mode: '0644'
 
-    - name: Debug before templated copy
-      debug:
-        msg:
-          - "Decoded Template Content Preview: {{ (apache_template_content_b64.content | b64decode)[:200] }}" # 앞 200자만 미리보기
-          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
-          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
-          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
-          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
-          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}"
-          # ... (템플릿에 사용되는 다른 모든 변수) ...
-      when: apache_template_content_b64.content is defined
-
-    - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
-      copy:
-        # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩.
-        # copy 모듈의 content는 Jinja2 템플릿팅을 지원하므로 | template 필터 불필요.
-        content: "{{ apache_template_content_b64.content | b64decode }}" # <--- | template 필터 없음!
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf" # OS별 vars에서 온 값 사용
+    - name: Deploy Apache virtual host configuration for Django (using template with /tmp path)
+      template:
+        src: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래의 파일 직접 지정
+        remote_src: yes
+        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
         owner: root
         group: root
         mode: '0644'
       notify: Restart Apache
-      when: apache_template_content_b64.content is defined # 파일 읽기 성공 시에만 실행
-      
-    - name: Clean up downloaded Apache template directory on VM
+
+    - name: Clean up downloaded Apache template file from /tmp
       file:
-        path: "{{ vm_templates_dir }}"
+        path: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         state: absent
 
     - name: Enable Apache site (Debian family only)
