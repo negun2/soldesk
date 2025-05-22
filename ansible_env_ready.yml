@@ -372,6 +372,15 @@
         dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
+    - name: Check Apache template file status before deployment
+      stat:
+        path: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+      register: apache_template_stat
+
+    - name: Show Apache template file stat
+      debug:
+        var: apache_template_stat
+
     - name: Deploy Apache virtual host configuration for Django
       template:
         src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
