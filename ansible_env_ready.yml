@@ -194,8 +194,6 @@
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
-    server_name_ip: "localhost"
-
 
        # OS별 변수 파일 다운로드 및 로드 (이 플레이에서도 별도로 vars 파일 로드)
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
@@ -209,6 +207,8 @@
     # !!! apache_wsgi_daemon_name 변수를 이 플레이의 vars 섹션에 명시적으로 정의 !!!
     apache_wsgi_daemon_name: "onpremweb_daemon"
     # OS별 apache_user, apache_group 등은 vars/*.yml 에서 가져옴
+
+    server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
 
     # OS별 변수 기본값 (로드 실패 대비)
     apache_user: ""
