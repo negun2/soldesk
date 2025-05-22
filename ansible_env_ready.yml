@@ -359,53 +359,45 @@
         path: "{{ target_user_home }}"
         mode: '0755' # 좀 더 명확한 권한 (소유자rwx, 그룹rx, otherrx)
 
-    - name: Create directory for downloaded Apache template on VM
-      file:
-        path: "{{ vm_templates_dir }}"
-        state: directory
-        mode: '0755'
+    #- name: Create directory for downloaded Apache template on VM
+    #  file:
+    #    path: "{{ vm_templates_dir }}"
+    #    state: directory
+    #    mode: '0755'
 
-    - name: Download Apache config template from GitHub
+    #- name: Download Apache config template from GitHub
+    #  get_url:
+    #    url: "{{ apache_conf_template_download_url }}"
+    #    dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+    #    mode: '0644'
+
+    - name: Download Apache config template to /tmp on VM
       get_url:
         url: "{{ apache_conf_template_download_url }}"
-        dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래로 직접 다운로드
         mode: '0644'
+      # register, until 등은 유지 가능
 
-    - name: Slurp downloaded Apache config template content
-      slurp:
-        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
-      register: apache_template_content_b64
-      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat"
-
-    - name: Debug before templated copy (확인용)
+    - name: Debug key variables before Apache conf deployment
       debug:
         msg:
-          - "OS Family: {{ ansible_os_family }}"
-          - "Decoded Template Preview: {{ (apache_template_content_b64.content | b64decode)[:300] if apache_template_content_b64.content is defined else 'TEMPLATE CONTENT NOT SLURPED' }}"
           - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
-          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
-          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
-          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
-          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}" # 이 변수도 vars에 정의 필요
-          - "django_project_name: {{ django_project_name | default('NOT DEFINED') }}"
-          - "django_project_config_name: {{ django_project_config_name | default('NOT DEFINED') }}"
-          - "apache_conf_dir: {{ apache_conf_dir | default('NOT DEFINED FROM VARS') }}"
-      when: apache_template_content_b64.content is defined
+          # ... (다른 변수들) ...
+          - "Template source path for template module: /tmp/{{ apache_conf_template_downloaded_filename }}"
 
-    - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
-      copy:
-        content: "{{ apache_template_content_b64.content | b64decode }}" # | template 필터 없음!
+    - name: Deploy Apache virtual host configuration for Django (using template module)
+      template:
+        src: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래의 파일 직접 지정
+        remote_src: yes  # VM 내의 파일을 소스로 사용함을 명시
         dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
         owner: root
         group: root
         mode: '0644'
       notify: Restart Apache
-      when: apache_template_content_b64.content is defined
 
     - name: Clean up downloaded Apache template file from /tmp
       file:
-        path: "{{ vm_templates_dir }}"
+        path: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         state: absent
 
     - name: Enable Apache site (Debian family only)
