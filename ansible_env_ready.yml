@@ -400,10 +400,10 @@
 
     - name: Collect static files
       command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
-      become: yes # root로 실행하거나,
-      become_user: "{{ target_user }}" # 또는 www-data 사용자로 실행 (staticfiles 디렉토리 쓰기 권한 필요)
+      become: yes # root 권한으로 collectstatic 실행
+      # become_user: "{{ target_user }}" # 이 줄은 제거
       args:
-        chdir: "{{ project_root_dir }}"
+        chdir: "{{ project_root_dir }}" # manage.py가 있는 디렉토리에서 실행
 
 
     - name: Set permissions for project directory for Apache
