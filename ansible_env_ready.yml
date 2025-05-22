@@ -60,12 +60,30 @@
       when: ansible_os_family == "Debian"
       ignore_errors: yes
 
+    - name: Debug debian_vars_file_b64 content before set_facts
+      debug:
+        var: debian_vars_file_b64 # slurp 결과를 직접 확인
+      when: ansible_os_family == "Debian"
+
     - name: Set facts from Debian vars file
       set_fact:
         "{{ item.key }}": "{{ item.value }}"
-      loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml) | dict2items }}"
-      when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined
-      no_log: true
+      loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
+      when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined and debian_vars_file_b64.content != ""
+      #no_log: true
+
+    # --- RedHat 계열 패키지 설치 전에도 디버깅 추가 (유사하게) ---
+    - name: Debug redhat_vars_file_b64 content before set_facts
+      debug:
+        var: redhat_vars_file_b64
+      when: ansible_os_family == "RedHat"
+
+    - name: Set facts from RedHat vars file
+      set_fact:
+        "{{ item.key }}": "{{ item.value }}"
+      # no_log: true # <--- 주석 처리 또는 삭제
+      loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
+      when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined and redhat_vars_file_b64.content != ""
 
     # --- RedHat 계열 패키지 설치 ---
     - name: Install base packages (RedHat family)
@@ -88,6 +106,23 @@
           - "{{ policycoreutils_package_name }}"
         state: present
       when: ansible_os_family == "RedHat"
+
+    # --- 패키지 설치 태스크 바로 전에 로드된 변수 값 확인 ---
+    - name: Debug effective package vars (Debian)
+      debug:
+        msg:
+          - "python_dev_package_name: {{ python_dev_package_name | default('NOT SET') }}"
+          - "apache_package_name: {{ apache_package_name | default('NOT SET') }}"
+          - "{{ apache_dev_package_name | default('NOT SET') }}"
+          - "{{ mod_wsgi_package_name_system | default('NOT SET') }}"
+          - "{{ python_virtualenv_package_name | default('NOT SET') }}"
+          - wget
+          - "{{ readline_dev_package_name | default('NOT SET') }}"
+          - "{{ zlib_dev_package_name | default('NOT SET') }}"
+          - "{{ libffi_dev_package_name | default('NOT SET') }}"
+          - "{{ libssl_dev_package_name | default('NOT SET') }}"
+          - "{{ apparmor-utils_package_name | default('NOT SET') }}"
+      when: ansible_os_family == "Debian"
 
     # --- Debian 계열 패키지 설치 ---
     - name: Install base packages (Debian family)
