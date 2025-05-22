@@ -194,6 +194,7 @@
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
+    server_name_ip: "localhost"
 
 
        # OS별 변수 파일 다운로드 및 로드 (이 플레이에서도 별도로 vars 파일 로드)
