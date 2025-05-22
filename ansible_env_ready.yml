@@ -70,7 +70,7 @@
         "{{ item.key }}": "{{ item.value }}"
       loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
       when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined and debian_vars_file_b64.content != ""
-      #no_log: true
+      no_log: true
 
     # --- RedHat 계열 패키지 설치 전에도 디버깅 추가 (유사하게) ---
     - name: Debug redhat_vars_file_b64 content before set_facts
@@ -81,7 +81,7 @@
     - name: Set facts from RedHat vars file
       set_fact:
         "{{ item.key }}": "{{ item.value }}"
-      # no_log: true # <--- 주석 처리 또는 삭제
+      no_log: true # <--- 주석 처리 또는 삭제
       loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
       when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined and redhat_vars_file_b64.content != ""
 
