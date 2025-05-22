@@ -371,25 +371,41 @@
         dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
-    - name: Download Apache config template to /tmp
-      get_url:
-        url: "{{ apache_conf_template_download_url }}"
-        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래로 직접 다운로드
-        mode: '0644'
+    - name: Slurp downloaded Apache config template content
+      slurp:
+        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+      register: apache_template_content_b64
+      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat"
 
-    - name: Deploy Apache virtual host configuration for Django (using template with /tmp path)
-      template:
-        src: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래의 파일 직접 지정
-        remote_src: yes
+    - name: Debug before templated copy (확인용)
+      debug:
+        msg:
+          - "OS Family: {{ ansible_os_family }}"
+          - "Decoded Template Preview: {{ (apache_template_content_b64.content | b64decode)[:300] if apache_template_content_b64.content is defined else 'TEMPLATE CONTENT NOT SLURPED' }}"
+          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
+          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
+          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
+          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
+          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
+          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}" # 이 변수도 vars에 정의 필요
+          - "django_project_name: {{ django_project_name | default('NOT DEFINED') }}"
+          - "django_project_config_name: {{ django_project_config_name | default('NOT DEFINED') }}"
+          - "apache_conf_dir: {{ apache_conf_dir | default('NOT DEFINED FROM VARS') }}"
+      when: apache_template_content_b64.content is defined
+
+    - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
+      copy:
+        content: "{{ apache_template_content_b64.content | b64decode }}" # | template 필터 없음!
         dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
         owner: root
         group: root
         mode: '0644'
       notify: Restart Apache
+      when: apache_template_content_b64.content is defined
 
     - name: Clean up downloaded Apache template file from /tmp
       file:
-        path: "/tmp/{{ apache_conf_template_downloaded_filename }}"
+        path: "{{ vm_templates_dir }}"
         state: absent
 
     - name: Enable Apache site (Debian family only)
