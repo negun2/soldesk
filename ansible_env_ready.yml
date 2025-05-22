@@ -121,7 +121,7 @@
           - "{{ zlib_dev_package_name | default('NOT SET') }}"
           - "{{ libffi_dev_package_name | default('NOT SET') }}"
           - "{{ libssl_dev_package_name | default('NOT SET') }}"
-          - "{{ apparmor-utils_package_name | default('NOT SET') }}"
+          - "{{ apparmor_utils_package_name | default('NOT SET') }}"
       when: ansible_os_family == "Debian"
 
     # --- Debian 계열 패키지 설치 ---
