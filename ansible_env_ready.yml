@@ -374,21 +374,34 @@
         - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
         - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" }
 
-    - name: Create staticfiles and mediafiles directories
+   - name: Create staticfiles and mediafiles directories as root
       file:
         path: "{{ project_root_dir }}/{{ item }}"
         state: directory
-        owner: "{{ target_user }}"
-        group: "{{ target_user }}"
-        mode: '0755'
+        # owner/group은 root로 생성 후 아래에서 변경
+        mode: '0755' # 일단 root로 생성 시 기본 권한
       loop:
         - staticfiles
         - mediafiles
-      become_user: "{{ target_user }}"
+      become: yes # root 권한으로 디렉토리 생성
+
+    - name: Change ownership of staticfiles and mediafiles directories
+      file:
+        path: "{{ project_root_dir }}/{{ item }}"
+        state: directory # 경로가 디렉토리임을 명시
+        owner: "{{ target_user }}"  # www-data
+        group: "{{ target_user }}"  # www-data
+        mode: '0755' # 최종 원하는 권한
+        recurse: yes # 만약 하위 파일/디렉토리도 있다면 (지금은 빈 디렉토리 생성)
+      loop:
+        - staticfiles
+        - mediafiles
+      become: yes # root 권한으로 소유권 변경
 
     - name: Collect static files
       command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
-      become_user: "{{ target_user }}"
+      become: yes # root로 실행하거나,
+      become_user: "{{ target_user }}" # 또는 www-data 사용자로 실행 (staticfiles 디렉토리 쓰기 권한 필요)
       args:
         chdir: "{{ project_root_dir }}"
 
