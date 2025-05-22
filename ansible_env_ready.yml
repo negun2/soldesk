@@ -14,7 +14,7 @@
 
     # OS별 변수 파일 다운로드 URL 및 경로
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars_play1"
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
   tasks:
     - name: Create directory for downloaded OS vars files
@@ -85,7 +85,7 @@
           - "{{ zlib_dev_package_name }}"
           - "{{ libffi_dev_package_name }}"
           - "{{ libssl_dev_package_name }}"
-          #- "{{ policycoreutils_package_name | default(omit) }}"
+          - "{{ policycoreutils_package_name }}"
         state: present
       when: ansible_os_family == "RedHat"
 
@@ -106,7 +106,8 @@
           - "{{ zlib_dev_package_name }}"
           - "{{ libffi_dev_package_name }}"
           - "{{ libssl_dev_package_name }}"
-          #- "{{ policycoreutils_package_name | default(omit) }}"
+          - "{{ apparmor-utils_package_name }}"
+
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
@@ -203,7 +204,7 @@
 
     # 임시 다운로드 경로 (첫 번째 플레이와 동일한 경로 사용 가능, 또는 고유 경로)
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일하게 사용
-    vm_templates_dir: "{{ (ansible_user_dir | default('/home/vagrant')) }}/templates_downloaded_play2" # 또는 /tmp/templates_downloaded
+    vm_templates_dir: "{{ (ansible_user_dir | default('/home/vagrant')) }}/templates_downloadeds" # 또는 /tmp/templates_downloaded
 
     # Apache 관련 변수 (OS별 vars 파일에서 덮어쓰여짐)
     apache_user: "www-data" # Ubuntu 기본값, RedHat.yml에서 "apache"로 덮어쓰여짐
@@ -337,16 +338,6 @@
       become_user: "{{ target_user }}"
       args:
         chdir: "{{ project_root_dir }}"
-
-    - name: Debug key variables before Apache conf deployment
-      debug:
-        msg:
-          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          - "apache_user: {{ apache_user | default('NOT DEFINED FROM VARS FILE') }}"
-          - "apache_group: {{ apache_group | default('NOT DEFINED FROM VARS FILE') }}"
-          - "venv_dir: {{ venv_dir }}"
-          - "project_root_dir: {{ project_root_dir }}"
-          - "django_project_config_name: {{ django_project_config_name }}"
 
 
     - name: Set permissions for project directory for Apache
