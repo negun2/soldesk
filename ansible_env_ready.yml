@@ -382,7 +382,17 @@
       debug:
         msg:
           - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          # ... (다른 변수들) ...
+          - "OS Family: {{ ansible_os_family }}"
+          - "Decoded Template Preview: {{ (apache_template_content_b64.content | b64decode)[:300] if apache_template_content_b64.content is defined else 'TEMPLATE CONTENT NOT SLURPED' }}"
+          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
+          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
+          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
+          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
+          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
+          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}" # 이 변수도 vars에 정의 필요
+          - "django_project_name: {{ django_project_name | default('NOT DEFINED') }}"
+          - "django_project_config_name: {{ django_project_config_name | default('NOT DEFINED') }}"
+          - "apache_conf_dir: {{ apache_conf_dir | default('NOT DEFINED FROM VARS') }}"
           - "Template source path for template module: /tmp/{{ apache_conf_template_downloaded_filename }}"
 
     - name: Deploy Apache virtual host configuration for Django (using template module)
