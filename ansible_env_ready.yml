@@ -141,7 +141,7 @@
           - "{{ zlib_dev_package_name }}"
           - "{{ libffi_dev_package_name }}"
           - "{{ libssl_dev_package_name }}"
-          - "{{ apparmor-utils_package_name }}"
+          - "{{ apparmor_utils_package_name }}"
 
         state: present
         update_cache: yes
