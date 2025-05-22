@@ -1,5 +1,5 @@
 # vars/RedHat.yml
-
+target_user: "apache"
 # --- Play 1: Setup Base System and Dependencies (Multi-OS) ---
 # "Install base packages (RedHat family)" 태스크에서 사용될 패키지 이름들
 python_dev_package_name: "python3-devel"
