@@ -343,13 +343,21 @@
       notify: Restart Apache
       changed_when: true # a2enmod는 성공 시 항상 changed 상태를 반환하도록 가정 (또는 register + changed_when 사용)
 
-    - name: Create Django project
+    - name: Create Django project as root
       command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ." # 현재 디렉토리에 프로젝트 파일 생성
       args:
         chdir: "{{ project_root_dir }}" # 프로젝트 루트 디렉토리에서 실행
         creates: "{{ project_root_dir }}/manage.py"
-      become: yes
-      become_user: "{{ target_user }}"
+      become: yes # root 권한으로 Django 프로젝트 생성
+
+    - name: Change ownership of Django project files
+      file:
+        path: "{{ project_root_dir }}"
+        owner: "{{ target_user }}"  # www-data
+        group: "{{ target_user }}"  # www-data
+        recurse: yes # 하위 파일 및 디렉토리 모두 변경
+        state: directory # 경로가 디렉토리임을 명시
+      become: yes # root 권한으로 소유권 변경
 
     - name: Configure Django settings
       lineinfile:
