@@ -8,8 +8,8 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ 
     ServerAlias {{ server_alias_domain }}
     {% endif %}
 
-    ErrorLog /var/log/httpd/{{ django_project_name }}-error.log
-    CustomLog /var/log/httpd/{{ django_project_name }}-access.log combined
+    ErrorLog {{ apache_log_dir }}/{{ django_project_name }}-error.log
+    CustomLog {{ apache_log_dir }}/{{ django_project_name }}-access.log combined
 
     WSGIScriptAlias / {{ project_root_dir }}/{{ django_project_config_name }}/wsgi.py
     WSGIProcessGroup {{ apache_wsgi_daemon_name }}
