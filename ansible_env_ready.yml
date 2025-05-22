@@ -324,15 +324,35 @@
       become: yes
       # 또는 become_user: "{{ target_user }}"
 
-    - name: Ensure mod_wsgi module is loaded in Apache (RedHat family)
-      copy: # RedHat에서는 mod_wsgi 로드 파일을 직접 관리할 수 있음
-        content: "{{ mod_wsgi_load_file_content_django | default('LoadModule wsgi_module modules/mod_wsgi_python3.so') }}"
-        dest: "/etc/httpd/conf.modules.d/10-wsgi-custom.conf" # 시스템 패키지와 다른 이름 사용
+    - name: Ensure mod_wsgi module is loaded and configured in Apache (RedHat family)
+      blockinfile:
+        path: /etc/httpd/conf.modules.d/10-wsgi-custom.conf # 또는 vars/RedHat.yml 에 정의된 파일
+        block: |
+          LoadModule wsgi_module modules/mod_wsgi_python3.so
+          WSGISocketPrefix /var/run/wsgi
+        create: yes # 파일이 없으면 생성
         owner: root
         group: root
         mode: '0644'
       when: ansible_os_family == "RedHat"
       notify: Restart Apache
+
+    - name: Create WSGI socket directory (RedHat family)
+      file:
+        path: /var/run/wsgi
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755' # 또는 '0770'
+      when: ansible_os_family == "RedHat"
+
+    - name: Set SELinux context for WSGI socket directory (RedHat family)
+      sefcontext:
+        target: '/var/run/wsgi(/.*)?'
+        setype: httpd_var_run_t
+        state: present
+      when: ansible_os_family == "RedHat"
+      notify: Restore wsgi socket dir SELinux context
 
     - name: Check for wsgi_py3 module availability (Debian family)
       stat:
@@ -580,3 +600,7 @@
     - name: Reload ufw
       command: ufw reload # 또는 service 모듈 사용 (ufw 서비스가 systemd로 관리된다면)
       when: ansible_os_family == "Debian"
+
+    - name: Restore wsgi socket dir SELinux context
+      command: "restorecon -Rv /var/run/wsgi"
+      when: ansible_os_family == "RedHat"
