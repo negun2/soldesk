@@ -372,22 +372,31 @@
         dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
-    - name: Slurp downloaded Apache config template content
-      slurp:
-        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
-      register: apache_template_content_b64
-
-    - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
-      copy:
-        # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩 후, 
-        content: "{{ apache_template_content_b64.content | b64decode }}"
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
+    - name: Deploy Apache virtual host configuration for Django
+      template:
+        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}" # VM 내 다운로드된 템플릿 경로
+        remote_src: yes  # <--- 이 옵션이 매우 중요!
+        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf" # OS별 vars에서 온 값 사용
         owner: root
         group: root
         mode: '0644'
       notify: Restart Apache
-      when: apache_template_content_b64.content is defined # 파일 읽기 성공 시에만 실행
 
+    #- name: Slurp downloaded Apache config template content
+    #  slurp:
+    #    src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+    #  register: apache_template_content_b64
+
+  #  - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
+  #    copy:
+  #      # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩 후, 
+  #      content: "{{ apache_template_content_b64.content | b64decode }}"
+  #      dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
+  #      owner: root
+  #      group: root
+  #      mode: '0644'
+  #    notify: Restart Apache
+  #    when: apache_template_content_b64.content is defined # 파일 읽기 성공 시에만 실행
     - name: Clean up downloaded Apache template directory on VM
       file:
         path: "{{ vm_templates_dir }}"
