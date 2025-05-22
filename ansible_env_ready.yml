@@ -378,6 +378,19 @@
       register: apache_template_content_b64
       when: ansible_os_family == "Debian" or ansible_os_family == "RedHat" # 필요한 OS에서만 실행
 
+    - name: Debug before templated copy
+      debug:
+        msg:
+          - "Decoded Template Content Preview: {{ (apache_template_content_b64.content | b64decode)[:200] }}" # 앞 200자만 미리보기
+          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
+          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
+          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
+          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
+          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
+          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}"
+          # ... (템플릿에 사용되는 다른 모든 변수) ...
+      when: apache_template_content_b64.content is defined
+
     - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
       copy:
         # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩.
