@@ -195,14 +195,15 @@
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
 
-       # OS별 변수 파일 다운로드 및 로드 (이 플레이에서도 별도로 vars 파일 로드)
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
-    # downloaded_vars_dir_play2: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars_play2"
 
+    # GitHub에서 가져오는 파일들 URL
+    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
     apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
     apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
-    ansible_playbook_dir: "{{ ansible_user_dir | default('/home/vagrant') }}" # 플레이북 다운로드된 경로
-    vm_templates_dir: "{{ ansible_playbook_dir }}/templates_downloaded"
+
+    # 임시 다운로드 경로 (첫 번째 플레이와 동일한 경로 사용 가능, 또는 고유 경로)
+    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일하게 사용
+    vm_templates_dir: "{{ (ansible_user_dir | default('/home/vagrant')) }}/templates_downloaded_play2" # 또는 /tmp/templates_downloaded
 
     # !!! apache_wsgi_daemon_name 변수를 이 플레이의 vars 섹션에 명시적으로 정의 !!!
     apache_wsgi_daemon_name: "onpremweb_daemon"
@@ -222,10 +223,7 @@
 
     - name: Include OS-specific variables for Django (using Play1's downloaded files)
       include_vars:
-        # dir 옵션 대신 file 옵션과 files_matching 사용
-        file: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars/{{ ansible_os_family }}.yml"
-        # 또는 dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
-        #      files_matching: "{{ ansible_os_family }}.yml"
+        file: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml" # 첫 번째 플레이에서 다운로드한 경로
       ignore_errors: yes # 파일이 없을 경우 대비
 
     - name: Ensure project directory exists
