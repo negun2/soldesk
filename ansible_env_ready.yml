@@ -341,14 +341,6 @@
           - "project_root_dir: {{ project_root_dir }}"
           - "django_project_config_name: {{ django_project_config_name }}"
 
-    - name: Deploy Apache virtual host configuration for Django
-      template:
-        src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Restart Apache
 
     - name: Set permissions for project directory for Apache
       file:
