@@ -5,7 +5,7 @@
 python_dev_package_name: "python3-devel"
 apache_package_name: "httpd"
 apache_dev_package_name: "httpd-devel"
-mod_wsgi_package_name_system: "python36-mod_wsgi" # 또는 IUS/EPEL에서 찾은 python3용 mod_wsgi 정확한 이름
+mod_wsgi_package_name_system: "python3-mod_wsgi" # 또는 IUS/EPEL에서 찾은 python3용 mod_wsgi 정확한 이름
                                                  # 예: 만약 시스템 기본 python3 (yum install python3)가 3.6.x이고,
                                                  # EPEL에 python3-mod_wsgi 가 있다면 그것을 사용.
                                                  # IUS 저장소를 추가하고 python36u를 사용한다면 python36u-mod_wsgi.
