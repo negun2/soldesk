@@ -374,7 +374,7 @@
         - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
         - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" }
 
-   - name: Create staticfiles and mediafiles directories as root
+    - name: Create staticfiles and mediafiles directories as root
       file:
         path: "{{ project_root_dir }}/{{ item }}"
         state: directory
