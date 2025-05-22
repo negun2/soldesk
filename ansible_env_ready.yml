@@ -275,28 +275,38 @@
         group: "{{ target_user }}" # www-data
         mode: '0755'
 
-    - name: Create Python virtual environment
+    - name: Create Python virtual environment as root
       command: "python3 -m venv {{ venv_dir }}"
       args:
         creates: "{{ venv_dir }}/bin/activate"
-      become: yes # root로 실행 후,
-      become_user: "{{ target_user }}" # www-data 사용자로 venv 생성
+      become: yes # root로 venv 생성
+
+    - name: Change ownership of virtual environment directory
+      file:
+        path: "{{ venv_dir }}"
+        owner: "{{ target_user }}"  # www-data
+        group: "{{ target_user }}"  # www-data
+        recurse: yes # 하위 파일 및 디렉토리 모두 변경
+        state: directory # 경로가 디렉토리임을 명시
+      become: yes # root 권한으로 소유권 변경
 
     - name: Install wheel in virtual environment before mod_wsgi
       pip:
         name: wheel
         virtualenv: "{{ venv_dir }}"
-        virtualenv_python: python3
-      become_user: "{{ target_user }}" # 가상환경 작업은 해당 사용자 권한으로
+        # virtualenv_python: python3 # pip 모듈이 가상환경을 인식하면 자동 감지
+      become: yes # pip 실행은 root로 하되, 가상환경을 지정하면 해당 환경에 설치
+      # 또는 become_user: "{{ target_user }}" 시도 (권한 문제 해결 후)
 
     - name: Install Django and mod_wsgi in virtual environment
       pip:
         name:
           - "django=={{ django_version }}"
-          - mod_wsgi # 가상환경에 mod_wsgi 설치 (Apache가 이 환경을 사용)
+          - mod_wsgi
         virtualenv: "{{ venv_dir }}"
-        virtualenv_python: python3
-      become_user: "{{ target_user }}"
+        # virtualenv_python: python3
+      become: yes
+      # 또는 become_user: "{{ target_user }}"
 
     - name: Ensure mod_wsgi module is loaded in Apache (RedHat family)
       copy: # RedHat에서는 mod_wsgi 로드 파일을 직접 관리할 수 있음
