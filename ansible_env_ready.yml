@@ -379,8 +379,8 @@
 
     - name: Deploy Apache virtual host configuration for Django (using slurp and copy)
       copy:
-        # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩 후, template 필터로 변수 치환
-        content: "{{ apache_template_content_b64.content | b64decode | template }}"
+        # slurp로 읽은 내용은 base64 인코딩되어 있으므로 디코딩 후, 
+        content: "{{ apache_template_content_b64.content | b64decode }}"
         dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
         owner: root
         group: root
