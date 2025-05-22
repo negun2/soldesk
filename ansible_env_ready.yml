@@ -383,6 +383,7 @@
     - name: Deploy Apache virtual host configuration for Django
       template:
         src: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
+        remote_src: yes
         dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf" # OS별 설정 디렉토리 사용
         owner: root
         group: root
