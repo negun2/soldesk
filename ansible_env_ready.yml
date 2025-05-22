@@ -475,6 +475,17 @@
         path: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         state: absent
 
+    - name: Disable default Apache site (Debian family only)
+      command: "a2dissite 000-default.conf"
+      args:
+        removes: "/etc/apache2/sites-enabled/000-default.conf"
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache # 기본 사이트 비활성화 후에도 Apache 재시작 필요
+      changed_when: "'disabled' in disable_default_site_result.stdout" # a2dissite 출력 기반 (선택적 개선)
+      register: disable_default_site_result # 실행 결과를 등록 (선택적 개선)
+      ignore_errors: yes
+      
+
     - name: Enable Apache site (Debian family only)
       command: "a2ensite {{ django_project_name }}"
       args:
