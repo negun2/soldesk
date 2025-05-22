@@ -11,7 +11,7 @@ readline_dev_package_name: "libreadline-dev"
 zlib_dev_package_name: "zlib1g-dev"
 libffi_dev_package_name: "libffi-dev"
 libssl_dev_package_name: "libssl-dev"
-apparmor-utils_package_name: "apparmor-utils"
+apparmor_utils_package_name: "apparmor-utils"
 # policycoreutils_package_name 변수는 Debian/Ubuntu에서는 SELinux 대신 AppArmor를 주로 사용하므로,
 # 해당 변수를 참조하는 부분을 플레이북에서 default(omit) 처리했거나, 여기에 빈 값을 넣거나,
 # 또는 AppArmor 관련 유틸리티 패키지명을 넣을 수 있습니다.
