@@ -376,7 +376,7 @@
 
     - name: Create staticfiles and mediafiles directories
       file:
-        path: "{{ project_root_dir }}/{{ staticfiles }}"
+        path: "{{ project_root_dir }}/{{ item }}"
         state: directory
         owner: "{{ target_user }}"
         group: "{{ target_user }}"
