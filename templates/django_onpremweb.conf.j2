@@ -1,6 +1,7 @@
 # templates/django_onpremweb.conf.j2
 
-WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5
+#WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5
+WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5 display-name=%{GROUP}
 
 <VirtualHost *:80>
     ServerName {{ server_name_ip }}
