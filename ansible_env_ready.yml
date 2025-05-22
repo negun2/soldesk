@@ -15,7 +15,8 @@
     # OS별 변수 파일 다운로드 URL 및 경로
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
-
+    
+    downloaded_os_vars_path: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_os_specific_vars" # 고유한 이름 사용
     ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
 
 
@@ -222,6 +223,10 @@
         path: "{{ sqlite_download_dest_dir }}"
         state: absent
 
+    - name: Set fact for downloaded OS vars path
+      set_fact:
+        os_vars_directory: "{{ downloaded_os_vars_path }}"
+
   handlers:
     - name: Run ldconfig
       command: ldconfig
@@ -235,7 +240,7 @@
   vars:
     # 공통 변수 (target_user_home, project_root_dir 등)
     target_user_home: "/var/www" # 또는 /srv 등 웹 콘텐츠 표준 경로
-    target_user: "www-data"      # 프로젝트 파일 소유자를 www-data로 (또는 다른 웹 전용 사용자)
+    #target_user: "www-data"      # 프로젝트 파일 소유자를 www-data로 (또는 다른 웹 전용 사용자)
     project_root_dir: "{{ target_user_home }}/{{ django_project_name | default('onpremweb_app') }}" # 예: /var/www/onpremweb_app
     venv_dir: "{{ project_root_dir }}/venv"
     django_project_name: "onpremweb" # 로그 파일명, Apache 설정 파일명 등에 사용
@@ -249,12 +254,12 @@
     apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
 
     # 임시 다운로드 경로 (첫 번째 플레이와 동일한 경로 사용 가능, 또는 고유 경로)
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일하게 사용
+    #downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일하게 사용
     vm_templates_dir: "{{ (ansible_user_dir | default('/home/vagrant')) }}/templates_downloadeds" # 또는 /tmp/templates_downloaded
 
     # Apache 관련 변수 (OS별 vars 파일에서 덮어쓰여짐)
-    apache_user: "www-data" # Ubuntu 기본값, RedHat.yml에서 "apache"로 덮어쓰여짐
-    apache_group: "www-data" # Ubuntu 기본값, RedHat.yml에서 "apache"로 덮어쓰여짐
+    apache_user: "" 
+    apache_group: "" 
     apache_conf_dir: ""
     apache_sites_enabled_dir: ""
     apache_service_name: ""
@@ -265,10 +270,10 @@
 
   tasks:
 
-    - name: Include OS-specific variables for Django
-      include_vars:
-        file: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
-      ignore_errors: yes
+    #- name: Include OS-specific variables for Django
+    #  include_vars:
+    #    file: "{{ hostvars.localhost.os_vars_directory | default(ansible_user_dir | default('/home/vagrant') ~ '/downloaded_vars_play1') }}/{{ ansible_os_family }}.yml"
+    #  ignore_errors: no
 
     - name: Ensure project parent directory exists and has correct permissions
       file:
