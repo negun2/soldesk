@@ -16,6 +16,9 @@
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
     downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
 
+    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
+
+
   tasks:
     - name: Create directory for downloaded OS vars files
       file:
@@ -84,6 +87,14 @@
       no_log: true # <--- 주석 처리 또는 삭제
       loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
       when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined and redhat_vars_file_b64.content != ""
+
+# --- IUS 저장소 설치 (RedHat family only, 다른 패키지 설치 전에 실행) ---
+    - name: Install IUS Community repository (RedHat family only)
+      yum:
+        name: "{{ ius_release_rpm_url }}"
+        state: present
+        disable_gpg_check: yes # IUS 릴리즈 RPM 자체는 GPG 체크 없이 설치 가능 (선택적)
+      when: ansible_os_family == "RedHat"
 
     # --- RedHat 계열 패키지 설치 ---
     - name: Install base packages (RedHat family)
