@@ -200,8 +200,11 @@
 
   vars:
     # Django 프로젝트 소유자 정보 (Ansible 연결 사용자 기준)
-    target_project_user: "{{ ansible_user_id }}"
-    target_project_user_home: "{{ ansible_user_dir }}"
+    target_project_user: "vagrant" # 명시적으로 vagrant 지정
+    target_project_user_home: "/home/{{ target_project_user }}" # /home/vagrants
+    # 플레이북 vars 예시 (AWS용)
+    #target_project_user: "{{ 'ec2-user' if ansible_distribution == 'Amazon' else ('ubuntu' if ansible_distribution == 'Ubuntu' else 'default_user') }}"
+    #target_project_user_home: "{{ '/home/' + target_project_user }}"
     python_executable: "python3"
 
     # 프로젝트 경로 및 설정
