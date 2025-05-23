@@ -461,9 +461,29 @@
         mode: '0644'
       notify: Restart Apache
 
-    - name: Disable default Apache site (Debian family only) # ... (이전과 동일)
-    - name: Enable Apache site for Django (Debian family only) # ... (이전과 동일)
-    - name: Ensure Apache service is enabled and running # ... (이전과 동일)
+    - name: Disable default Apache site (Debian family only) # <--- 여기가 464번째 줄 근처일 수 있음
+      command: a2dissite 000-default.conf # <--- 이 라인 또는 유사한 모듈 호출이 있어야 함
+      args:
+        removes: "{{ apache_sites_enabled_dir }}/000-default.conf"
+      when: ansible_os_family == "Debian" and apache_sites_enabled_dir is defined and apache_sites_enabled_dir != ""
+      notify: Restart Apache
+      register: disable_default_site_result
+      changed_when: "'disabled' in disable_default_site_result.stdout"
+      ignore_errors: yes
+
+    - name: Enable Apache site for Django (Debian family only)
+      command: "a2ensite {{ django_project_name }}" # <--- 모듈 호출
+      args:
+        creates: "{{ apache_sites_enabled_dir }}/{{ django_project_name }}.conf"
+      when: ansible_os_family == "Debian" and apache_sites_enabled_dir is defined and apache_sites_enabled_dir != ""
+      notify: Restart Apache
+      changed_when: true
+
+    - name: Ensure Apache service is enabled and running
+      service: # <--- 모듈 호출
+        name: "{{ apache_service_name }}"
+        state: started
+        enabled: yes
 
     # --- SELinux 설정 (Boolean 테스트 집중) ---
     - name: Configure SELinux Booleans for Apache (RedHat family only)
