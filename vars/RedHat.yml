@@ -11,7 +11,7 @@ readline_dev_package_name: "readline-devel"
 zlib_dev_package_name: "zlib-devel"
 libffi_dev_package_name: "libffi-devel"
 libssl_dev_package_name: "openssl-devel"
-policycoreutils_package_name: "policycoreutils-python-utils" # semanage, sefcontext 등 SELinux 유틸리티
+policycoreutils_package_name: "policycoreutils-python" # semanage, sefcontext 등 SELinux 유틸리티
 
 # --- Play 2: Setup Django Web Environment (Multi-OS) ---
 apache_user: "apache"
