@@ -9,16 +9,17 @@
     # 공통 변수
     sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
     sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
-    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
+    sqlite_download_dest_dir: "/tmp/sqlite_downloaded" # 임시 사용 후 삭제되므로 /tmp 사용 무방
     sqlite_install_prefix: "/usr/local"
 
     # OS별 변수 파일 다운로드 URL 및 경로
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/refs/heads/main/vars"
-    downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars"
-    
-    downloaded_os_vars_path: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_os_specific_vars" # 고유한 이름 사용
-    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
+    # ansible_user_dir은 gather_facts:yes 일 때 보통 ansible_facts.user_dir 로 접근 가능
+    # 또는 ansible_env.HOME 사용 가능. 여기서는 명시적으로 lookup 사용.
+    current_vars_download_user_home: "{{ lookup('env', 'HOME') }}" # 플레이북 실행 환경의 HOME
+    downloaded_vars_dir: "{{ current_vars_download_user_home }}/downloaded_vars_play1" # 첫 번째 플레이에서만 사용하고 정리될 수 있도록
 
+    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
 
   tasks:
     - name: Create directory for downloaded OS vars files
@@ -26,6 +27,8 @@
         path: "{{ downloaded_vars_dir }}"
         state: directory
         mode: '0755'
+      # become: no # 현재 사용자 권한으로 생성 (만약 become: yes 상태라면 root로 생성됨)
+      # delegate_to: localhost # 명시적으로 로컬에서 실행
 
     - name: Download OS-specific var files from GitHub
       get_url:
@@ -35,27 +38,25 @@
       loop:
         - "RedHat.yml"
         - "Debian.yml"
-        # 추가적인 OS별 _django.yml 파일 등을 사용한다면 여기에 추가
-      ignore_errors: yes # 특정 파일이 없을 경우 대비
+      ignore_errors: yes
+      # delegate_to: localhost
 
-
-    # --- 변수 로드 방식을 slurp + set_fact으로 변경 ---
+    # --- 변수 로드 방식 (기존 slurp + set_fact 유지) ---
     - name: Read RedHat vars file content
       slurp:
         src: "{{ downloaded_vars_dir }}/RedHat.yml"
       register: redhat_vars_file_b64
       when: ansible_os_family == "RedHat"
-      ignore_errors: yes # 파일이 없을 경우 대비
+      ignore_errors: yes
+      # delegate_to: localhost
 
     - name: Set facts from RedHat vars file
       set_fact:
-        # b64decode로 디코딩 후 from_yaml로 파싱
-        # update_vars를 사용하여 기존 변수와 병합 (또는 os_vars 와 같이 새로운 변수로 그룹화)
-        # 여기서는 직접 변수 공간에 등록
         "{{ item.key }}": "{{ item.value }}"
-      loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml) | dict2items }}"
-      when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined
-      no_log: true # 변수 내용이 로그에 많이 남지 않도록
+      loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
+      when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined and redhat_vars_file_b64.content != ""
+      no_log: true
+      # delegate_to: localhost
 
     - name: Read Debian vars file content
       slurp:
@@ -63,11 +64,7 @@
       register: debian_vars_file_b64
       when: ansible_os_family == "Debian"
       ignore_errors: yes
-
-    - name: Debug debian_vars_file_b64 content before set_facts
-      debug:
-        var: debian_vars_file_b64 # slurp 결과를 직접 확인
-      when: ansible_os_family == "Debian"
+      # delegate_to: localhost
 
     - name: Set facts from Debian vars file
       set_fact:
@@ -75,6 +72,7 @@
       loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
       when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined and debian_vars_file_b64.content != ""
       no_log: true
+      # delegate_to: localhost
 
     # --- RedHat 계열 패키지 설치 전에도 디버깅 추가 (유사하게) ---
     - name: Debug redhat_vars_file_b64 content before set_facts
@@ -97,7 +95,7 @@
         disable_gpg_check: yes # IUS 릴리즈 RPM 자체는 GPG 체크 없이 설치 가능 (선택적)
       when: ansible_os_family == "RedHat"
 
-    # --- RedHat 계열 패키지 설치 ---
+    # RedHat 계열 패키지 설치 (epel-release, python3 등)
     - name: Install base packages (RedHat family)
       yum:
         name:
@@ -105,17 +103,17 @@
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name }}"
-          - "{{ apache_package_name }}"
-          - "{{ apache_dev_package_name }}"
-          - "{{ mod_wsgi_package_name_system }}" # 시스템 Apache용 mod_wsgi
-          - "{{ python_virtualenv_package_name }}"
+          - "{{ python_dev_package_name | default(omit) }}" # OS별 변수
+          - "{{ apache_package_name | default(omit) }}"
+          - "{{ apache_dev_package_name | default(omit) }}"
+          - "{{ mod_wsgi_package_name_system | default(omit) }}"
+          - "{{ python_virtualenv_package_name | default(omit) }}"
           - wget
-          - "{{ readline_dev_package_name }}"
-          - "{{ zlib_dev_package_name }}"
-          - "{{ libffi_dev_package_name }}"
-          - "{{ libssl_dev_package_name }}"
-          - "{{ policycoreutils_package_name }}"
+          - "{{ readline_dev_package_name | default(omit) }}"
+          - "{{ zlib_dev_package_name | default(omit) }}"
+          - "{{ libffi_dev_package_name | default(omit) }}"
+          - "{{ libssl_dev_package_name | default(omit) }}"
+          - "{{ policycoreutils_package_name | default(omit) }}" # SELinux 유틸리티
         state: present
       when: ansible_os_family == "RedHat"
 
@@ -136,25 +134,24 @@
           - "{{ apparmor_utils_package_name | default('NOT SET') }}"
       when: ansible_os_family == "Debian"
 
-    # --- Debian 계열 패키지 설치 ---
+    # Debian 계열 패키지 설치 (python3, python3-pip 등)
     - name: Install base packages (Debian family)
       apt:
         name:
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name }}"
-          - "{{ apache_package_name }}"
-          - "{{ apache_dev_package_name }}"
-          - "{{ mod_wsgi_package_name_system }}" # 시스템 Apache용 mod_wsgi
-          - "{{ python_virtualenv_package_name }}"
+          - "{{ python_dev_package_name | default(omit) }}" # OS별 변수
+          - "{{ apache_package_name | default(omit) }}"
+          - "{{ apache_dev_package_name | default(omit) }}"
+          - "{{ mod_wsgi_package_name_system | default(omit) }}"
+          - "{{ python_virtualenv_package_name | default(omit) }}"
           - wget
-          - "{{ readline_dev_package_name }}"
-          - "{{ zlib_dev_package_name }}"
-          - "{{ libffi_dev_package_name }}"
-          - "{{ libssl_dev_package_name }}"
-          - "{{ apparmor_utils_package_name }}"
-
+          - "{{ readline_dev_package_name | default(omit) }}"
+          - "{{ zlib_dev_package_name | default(omit) }}"
+          - "{{ libffi_dev_package_name | default(omit) }}"
+          - "{{ libssl_dev_package_name | default(omit) }}"
+          - "{{ apparmor_utils_package_name | default(omit) }}" # AppArmor 유틸리티
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
@@ -227,9 +224,17 @@
       set_fact:
         os_vars_directory: "{{ downloaded_os_vars_path }}"
 
+    - name: Clean up downloaded OS vars directory from Play 1
+      file:
+        path: "{{ downloaded_vars_dir }}"
+        state: absent
+      # delegate_to: localhost
+      # become: no # 현재 사용자 권한으로 삭제 시도
+
   handlers:
     - name: Run ldconfig
       command: ldconfig
+      become: yes
 
 # --- 두 번째 플레이: Setup Django Web Environment (Multi-OS) ---
 - name: Setup Django Web Environment (Multi-OS)
@@ -238,81 +243,80 @@
   gather_facts: yes
 
   vars:
-    # 공통 변수 (target_user_home, project_root_dir 등)
-    target_user_home: "/var/www" # 또는 /srv 등 웹 콘텐츠 표준 경로
-    #target_user: "www-data"      # 프로젝트 파일 소유자를 www-data로 (또는 다른 웹 전용 사용자)
-    project_root_dir: "{{ target_user_home }}/{{ django_project_name | default('onpremweb_app') }}" # 예: /var/www/onpremweb_app
+    # --- Ansible 실행 사용자 정보 ---
+    # ansible_user_id 는 연결 사용자의 이름 (e.g., vagrant, ec2-user)
+    # ansible_user_dir 은 해당 사용자의 홈 디렉토리 (e.g., /home/vagrant)
+    # gather_facts: yes 로 수집됨.
+    project_owner: "{{ ansible_user_id | default(lookup('env', 'USER')) }}"
+    project_owner_home: "{{ ansible_user_dir | default(lookup('env', 'HOME')) }}"
+
+    # --- 프로젝트 경로 및 설정 ---
+    django_project_name: "onpremweb" # 프로젝트 애플리케이션 이름 (디렉토리명, 설정 파일명 등에 사용)
+    django_project_app_dirname: "{{ django_project_name }}_app" # 실제 프로젝트 파일들이 위치할 디렉토리명
+    
+    # target_user_home을 project_owner_home으로 변경
+    project_base_dir: "{{ project_owner_home }}" # 예: /home/vagrant
+    project_root_dir: "{{ project_base_dir }}/{{ django_project_app_dirname }}" # 예: /home/vagrant/onpremweb_app
+    
     venv_dir: "{{ project_root_dir }}/venv"
-    django_project_name: "onpremweb" # 로그 파일명, Apache 설정 파일명 등에 사용
-    django_project_config_name: "onprem_project_config" # Django 프로젝트 내부 설정 디렉토리
+    django_project_config_name: "onprem_project_config" # Django 프로젝트 내부 설정 디렉토리 (startproject 시 생성되는 이름)
     django_version: "3.2.25"
 
+    # --- Apache 및 OS별 변수 로드 ---
+    # 이 변수들은 첫 번째 플레이에서 set_fact로 설정되었거나, OS별 vars 파일에서 가져옴
+    # apache_user, apache_group, apache_conf_dir 등은 OS별 vars 파일에 정의되어 있어야 함
+    # (RedHat.yml, Debian.yml 확인 필요)
 
     # GitHub에서 가져오는 파일들 URL
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
     apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
     apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
-
-    # 임시 다운로드 경로 (첫 번째 플레이와 동일한 경로 사용 가능, 또는 고유 경로)
-    #downloaded_vars_dir: "{{ ansible_user_dir | default('/home/vagrant') }}/downloaded_vars" # 첫 번째 플레이와 동일하게 사용
-    vm_templates_dir: "{{ (ansible_user_dir | default('/home/vagrant')) }}/templates_downloadeds" # 또는 /tmp/templates_downloaded
-
-    # Apache 관련 변수 (OS별 vars 파일에서 덮어쓰여짐)
-    apache_user: "" 
-    apache_group: "" 
-    apache_conf_dir: ""
-    apache_sites_enabled_dir: ""
-    apache_service_name: ""
-    mod_wsgi_load_file_content_django: ""
-    apache_log_dir: "" # OS별 vars 파일에서 정의 (예: /var/log/apache2 또는 /var/log/httpd)
+    
     server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
-    apache_wsgi_daemon_name: "onpremweb_daemon"
-
+    apache_wsgi_daemon_name: "{{ django_project_name }}_daemon" # 고유한 데몬 이름
+  
+  
   tasks:
 
-    #- name: Include OS-specific variables for Django
-    #  include_vars:
-    #    file: "{{ hostvars.localhost.os_vars_directory | default(ansible_user_dir | default('/home/vagrant') ~ '/downloaded_vars_play1') }}/{{ ansible_os_family }}.yml"
-    #  ignore_errors: no
+    # --- OS별 변수 다시 로드 (두 번째 플레이를 독립적으로 실행할 경우 대비) ---
+    # 첫 번째 플레이에서 이미 로드했지만, 이 플레이만 따로 실행할 경우를 위해 중복 포함 가능
+    # 또는 첫 번째 플레이의 set_fact 결과를 hostvars로 참조 (더 효율적)
+    # 여기서는 hostvars를 사용하는 방식으로 가정하고, 중복 로드 코드는 생략.
+    # 만약 필요하다면 첫 번째 플레이의 변수 로드 부분을 여기에 다시 넣거나 include_role 등으로 분리.
 
-    - name: Ensure project parent directory exists and has correct permissions
+    # --- 프로젝트 디렉토리 생성 및 소유권 설정 ---
+    - name: Ensure project base directory (user's home) exists and has basic permissions
       file:
-        path: "{{ target_user_home }}" # 예: /var/www
+        path: "{{ project_base_dir }}" # 예: /home/vagrant
         state: directory
-        owner: root # 또는 적절한 관리자
-        group: root # 또는 적절한 그룹
-        mode: '0755' # 다른 사용자가 접근 가능하도록
+        owner: "{{ project_owner }}"
+        group: "{{ project_owner }}" # 기본 그룹도 project_owner로
+        mode: '0755' # 소유자 rwx, 그룹 rx, other rx (Apache가 접근하려면 최소 x 필요)
+      become: yes # root로 생성/권한 보장
 
-    - name: Ensure project directory exists with correct owner/group
+    - name: Ensure project root directory exists with project_owner ownership
       file:
-        path: "{{ project_root_dir }}" # 예: /var/www/onpremweb_app
+        path: "{{ project_root_dir }}" # 예: /home/vagrant/onpremweb_app
         state: directory
-        owner: "{{ target_user }}" # www-data
-        group: "{{ target_user }}" # www-data
-        mode: '0755'
+        owner: "{{ project_owner }}"
+        group: "{{ project_owner }}"
+        mode: '0755' # 소유자 rwx, 그룹 rx, other rx
+      become: yes # root로 생성 후 소유권 설정
 
-    - name: Create Python virtual environment as root
+    # --- 가상 환경 생성 및 패키지 설치 (project_owner 권한으로) ---
+    - name: Create Python virtual environment
       command: "python3 -m venv {{ venv_dir }}"
       args:
         creates: "{{ venv_dir }}/bin/activate"
-      become: yes # root로 venv 생성
+      become: yes
+      become_user: "{{ project_owner }}" # project_owner 권한으로 venv 생성
 
-    - name: Change ownership of virtual environment directory
-      file:
-        path: "{{ venv_dir }}"
-        owner: "{{ target_user }}"  # www-data
-        group: "{{ target_user }}"  # www-data
-        recurse: yes # 하위 파일 및 디렉토리 모두 변경
-        state: directory # 경로가 디렉토리임을 명시
-      become: yes # root 권한으로 소유권 변경
-
-    - name: Install wheel in virtual environment before mod_wsgi
+    - name: Install wheel in virtual environment
       pip:
         name: wheel
         virtualenv: "{{ venv_dir }}"
-        # virtualenv_python: python3 # pip 모듈이 가상환경을 인식하면 자동 감지
-      become: yes # pip 실행은 root로 하되, 가상환경을 지정하면 해당 환경에 설치
-      # 또는 become_user: "{{ target_user }}" 시도 (권한 문제 해결 후)
+        # virtualenv_command: "{{ venv_dir }}/bin/python -m pip" # 명시적 pip 경로
+      become: yes # pip 실행은 root로 하되, 가상환경은 project_owner 소유
+      # 또는 become_user: "{{ project_owner }}" (권한 문제 없을 시)
 
     - name: Install Django and mod_wsgi in virtual environment
       pip:
@@ -320,17 +324,21 @@
           - "django=={{ django_version }}"
           - mod_wsgi
         virtualenv: "{{ venv_dir }}"
-        # virtualenv_python: python3
       become: yes
-      # 또는 become_user: "{{ target_user }}"
+      # 또는 become_user: "{{ project_owner }}"
+
+    # --- Apache mod_wsgi 설정 ---
+    # RedHat: /etc/httpd/conf.modules.d/10-wsgi-custom.conf
+    # Debian: a2enmod wsgi_py3 (또는 wsgi)
+    # 이 부분은 기존 로직 유지, OS별 변수(apache_conf_dir 등)가 정확해야 함.
 
     - name: Ensure mod_wsgi module is loaded and configured in Apache (RedHat family)
       blockinfile:
-        path: /etc/httpd/conf.modules.d/10-wsgi-custom.conf # 또는 vars/RedHat.yml 에 정의된 파일
+        path: "/etc/httpd/conf.modules.d/00-wsgi-custom.conf" # 기존 경로 또는 OS별 변수 사용
         block: |
           LoadModule wsgi_module modules/mod_wsgi_python3.so
           WSGISocketPrefix /var/run/wsgi
-        create: yes # 파일이 없으면 생성
+        create: yes
         owner: root
         group: root
         mode: '0644'
@@ -339,10 +347,10 @@
 
     - name: Create WSGI socket directory (RedHat family)
       file:
-        path: /var/run/wsgi
+        path: /var/run/wsgi # 이 경로는 Apache 사용자(예: apache)가 쓸 수 있어야 함
         state: directory
-        owner: apache
-        group: apache
+        owner: "{{ apache_user }}" # OS별 vars 파일에서 정의된 웹서버 사용자
+        group: "{{ apache_group }}" # OS별 vars 파일에서 정의된 웹서버 그룹
         mode: '0755' # 또는 '0770'
       when: ansible_os_family == "RedHat"
 
@@ -351,256 +359,262 @@
         target: '/var/run/wsgi(/.*)?'
         setype: httpd_var_run_t
         state: present
-      when: ansible_os_family == "RedHat"
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled" # SELinux 활성화 시에만
       notify: Restore wsgi socket dir SELinux context
 
-    - name: Check for wsgi_py3 module availability (Debian family)
-      stat:
-        path: "/etc/apache2/mods-available/wsgi_py3.load" # 일반적인 파일명
-      register: wsgi_py3_load_file_stat
+    # Debian 계열 mod_wsgi 활성화 (기존 로직 유지)
+    - name: Determine and Enable wsgi module (Debian family)
+      block:
+        - name: Check for wsgi_py3 module availability (Debian family)
+          stat: path="/etc/apache2/mods-available/wsgi_py3.load"
+          register: wsgi_py3_load_file_stat
+        - name: Check for wsgi (generic) module availability (Debian family) - fallback
+          stat: path="/etc/apache2/mods-available/wsgi.load"
+          register: wsgi_load_file_stat
+          when: not wsgi_py3_load_file_stat.stat.exists
+        - name: Set correct wsgi module name for a2enmod (Debian family)
+          set_fact:
+            apache_wsgi_module_name_debian: >-
+              {%- if wsgi_py3_load_file_stat.stat.exists -%}wsgi_py3
+              {%- elif wsgi_load_file_stat.stat.exists -%}wsgi
+              {%- else -%}{%- endif -%}
+        - name: Enable wsgi module on Debian family
+          command: "a2enmod {{ apache_wsgi_module_name_debian }}"
+          args:
+            creates: "/etc/apache2/mods-enabled/{{ apache_wsgi_module_name_debian }}.load"
+          when: apache_wsgi_module_name_debian is defined and apache_wsgi_module_name_debian != ""
+          notify: Restart Apache
+          changed_when: true
       when: ansible_os_family == "Debian"
 
-    - name: Check for wsgi (generic) module availability (Debian family) - fallback
-      stat:
-        path: "/etc/apache2/mods-available/wsgi.load" # 다른 가능한 파일명
-      register: wsgi_load_file_stat
-      when: ansible_os_family == "Debian" and not wsgi_py3_load_file_stat.stat.exists
-
-    - name: Determine correct wsgi module name for a2enmod (Debian family)
-      set_fact:
-        apache_wsgi_module_name_debian: "{{ 'wsgi_py3' if wsgi_py3_load_file_stat.stat.exists else ('wsgi' if wsgi_load_file_stat.stat.exists else '') }}"
-      when: ansible_os_family == "Debian"
-
-    - name: Enable wsgi module on Debian family
-      command: "a2enmod {{ apache_wsgi_module_name_debian }}"
+    # --- Django 프로젝트 생성 및 설정 (project_owner 권한으로) ---
+    - name: Create Django project
+      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ."
       args:
-        creates: "/etc/apache2/mods-enabled/{{ apache_wsgi_module_name_debian }}.load"
-      when: ansible_os_family == "Debian" and apache_wsgi_module_name_debian # 모듈 이름이 결정되었을 때만 실행
-      notify: Restart Apache
-      changed_when: true # a2enmod는 성공 시 항상 changed 상태를 반환하도록 가정 (또는 register + changed_when 사용)
-
-    - name: Create Django project as root
-      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ." # 현재 디렉토리에 프로젝트 파일 생성
-      args:
-        chdir: "{{ project_root_dir }}" # 프로젝트 루트 디렉토리에서 실행
+        chdir: "{{ project_root_dir }}"
         creates: "{{ project_root_dir }}/manage.py"
-      become: yes # root 권한으로 Django 프로젝트 생성
+      become: yes
+      become_user: "{{ project_owner }}"
 
-    - name: Change ownership of Django project files
-      file:
-        path: "{{ project_root_dir }}"
-        owner: "{{ target_user }}"  # www-data
-        group: "{{ target_user }}"  # www-data
-        recurse: yes # 하위 파일 및 디렉토리 모두 변경
-        state: directory # 경로가 디렉토리임을 명시
-      become: yes # root 권한으로 소유권 변경
-
-    - name: Configure Django settings
+    - name: Configure Django settings (ALLOWED_HOSTS, STATIC_ROOT, MEDIA_ROOT)
       lineinfile:
         path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
         regexp: "{{ item.regexp }}"
         line: "{{ item.line }}"
-        insertafter: "{{ item.insertafter | default('^# Application definition') }}"
-        create: yes
+        insertafter: "{{ item.insertafter | default(omit) }}" # omit이면 파일 끝에 추가 (기본값)
+        insertbefore: "{{ item.insertbefore | default(omit) }}"
+        create: no # 파일은 이미 startproject로 생성됨
+        owner: "{{ project_owner }}" # 파일 소유자 명시 (lineinfile은 owner/group 변경 안함)
+        group: "{{ project_owner }}"
+        mode: '0644' # 일반 파일 권한
       loop:
-        - { regexp: "^STATIC_URL = .*", line: "STATIC_URL = '/static/'", insertafter: "^BASE_DIR = .*" }
-        - { regexp: "^STATIC_ROOT = .*", line: "STATIC_ROOT = BASE_DIR / 'staticfiles'", insertafter: "^BASE_DIR = .*" }
-        - { regexp: "^MEDIA_URL = .*", line: "MEDIA_URL = '/media/'", insertafter: "^BASE_DIR = .*" }
-        - { regexp: "^MEDIA_ROOT = .*", line: "MEDIA_ROOT = BASE_DIR / 'mediafiles'", insertafter: "^BASE_DIR = .*" }
         - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
         - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" }
+        - { regexp: "^STATIC_URL = .*", line: "STATIC_URL = '/static/'", insertafter: "^BASE_DIR = .*" } # BASE_DIR 다음에 오는 것이 좋음
+        - { regexp: "^STATIC_ROOT = .*", line: "STATIC_ROOT = BASE_DIR / 'staticfiles'", insertafter: "STATIC_URL = '/static/'" }
+        - { regexp: "^MEDIA_URL = .*", line: "MEDIA_URL = '/media/'", insertafter: "STATIC_ROOT = BASE_DIR / 'staticfiles'" }
+        - { regexp: "^MEDIA_ROOT = .*", line: "MEDIA_ROOT = BASE_DIR / 'mediafiles'", insertafter: "MEDIA_URL = '/media/'" }
+      become: yes # root로 파일 수정 (project_owner 소유 파일이므로 become_user도 가능)
 
-    - name: Create staticfiles and mediafiles directories as root
+    - name: Create staticfiles and mediafiles directories
       file:
         path: "{{ project_root_dir }}/{{ item }}"
         state: directory
-        # owner/group은 root로 생성 후 아래에서 변경
-        mode: '0755' # 일단 root로 생성 시 기본 권한
+        owner: "{{ project_owner }}"
+        group: "{{ project_owner }}"
+        mode: '0755'
       loop:
         - staticfiles
         - mediafiles
-      become: yes # root 권한으로 디렉토리 생성
-
-    - name: Change ownership of staticfiles and mediafiles directories
-      file:
-        path: "{{ project_root_dir }}/{{ item }}"
-        state: directory # 경로가 디렉토리임을 명시
-        owner: "{{ target_user }}"  # www-data
-        group: "{{ target_user }}"  # www-data
-        mode: '0755' # 최종 원하는 권한
-        recurse: yes # 만약 하위 파일/디렉토리도 있다면 (지금은 빈 디렉토리 생성)
-      loop:
-        - staticfiles
-        - mediafiles
-      become: yes # root 권한으로 소유권 변경
+      become: yes
+      become_user: "{{ project_owner }}" # project_owner 권한으로 생성
 
     - name: Collect static files
-      command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
-      become: yes # root 권한으로 collectstatic 실행
-      # become_user: "{{ target_user }}" # 이 줄은 제거
+      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
       args:
-        chdir: "{{ project_root_dir }}" # manage.py가 있는 디렉토리에서 실행
+        chdir: "{{ project_root_dir }}"
+      become: yes
+      become_user: "{{ project_owner }}"
+      environment: # Django가 settings.py를 찾도록
+        PYTHONPATH: "{{ project_root_dir }}"
+        DJANGO_SETTINGS_MODULE: "{{ django_project_config_name }}.settings"
 
-
-    - name: Set permissions for project directory for Apache
+    # --- Apache 접근을 위한 권한 설정 ---
+    - name: Ensure Apache group can access project_owner's home directory path
       file:
         path: "{{ item }}"
-        owner: "{{ target_user }}"
-        group: "{{ apache_group }}" # OS별 Apache 그룹
-        mode: "{{ 'g+rX' if item == project_root_dir else '0775' }}"
-        recurse: "{{ 'yes' if item != project_root_dir else 'no' }}"
+        # owner/group은 건드리지 않음 (보통 root 또는 user 소유)
+        mode: '0711' # u=rwx, g=x, o=x (다른 사용자가 디렉토리 리스팅은 못하지만, 내부 파일 접근은 가능하도록 x 권한 부여)
+                     # 또는 mode: 'g+x' 로 그룹 실행 권한만 추가 (더 안전)
+        state: directory
+      # project_root_dir의 상위 디렉토리들에 대해 실행 권한(x) 부여
+      # 예: /home, /home/vagrant
+      loop: "{{ project_base_dir.split('/') | select() | map('join', '/') | map(attribute=' voorafgegaan door /') | list }}"
+      # 위 loop는 복잡하므로, 간단히 project_base_dir에 대해서만 설정
+      # 또는 알려진 상위 경로(/home)에 대해 설정
+      become: yes
+      when: "project_base_dir.startswith('/home')" # /home 아래인 경우에만
+
+    - name: Set ACLs for Apache to access project directories (Alternative to changing group)
+      acl:
+        path: "{{ item.path }}"
+        entity: "{{ apache_group }}" # OS별 웹서버 그룹
+        etype: group
+        permissions: "{{ item.permissions }}"
+        state: present
+        recursive: "{{ item.recursive | default(false) }}"
       loop:
-        - "{{ project_root_dir }}"
-        - "{{ project_root_dir }}/staticfiles"
-        - "{{ project_root_dir }}/mediafiles"
-        - "{{ venv_dir }}"
+        - { path: "{{ project_base_dir }}", permissions: "x", recursive: false } # 홈 디렉토리 자체에는 실행(탐색) 권한
+        - { path: "{{ project_root_dir }}", permissions: "rX", recursive: true } # 프로젝트 루트와 하위에는 읽기 및 탐색 권한
+        - { path: "{{ venv_dir }}", permissions: "rX", recursive: true } # 가상환경에도 읽기 및 탐색 권한
+        # staticfiles, mediafiles는 project_root_dir recursive:true 로 커버됨
+      become: yes
+      when: ansible_os_family != "Darwin" # ACL 모듈은 macOS에서 기본 지원 안함, Linux에서 주로 사용. CentOS/RHEL은 acl 패키지 필요.
 
-    - name: Allow Apache to search user's home directory
-      file:
-        path: "{{ target_user_home }}"
-        mode: '0755' # 좀 더 명확한 권한 (소유자rwx, 그룹rx, otherrx)
+    # ACL 대신 전통적인 그룹 변경 방식 (선택)
+    # - name: Change group of project files for Apache access
+    #   file:
+    #     path: "{{ item }}"
+    #     group: "{{ apache_group }}"
+    #     recurse: yes
+    #   loop:
+    #     - "{{ project_root_dir }}"
+    #     - "{{ venv_dir }}" # venv도 Apache 그룹이 접근 가능해야 할 수 있음 (mod_wsgi)
+    #   become: yes
 
-    #- name: Create directory for downloaded Apache template on VM
-    #  file:
-    #    path: "{{ vm_templates_dir }}"
-    #    state: directory
-    #    mode: '0755'
+    # - name: Set permissions for Apache group
+    #   file:
+    #     path: "{{ item.path }}"
+    #     mode: "{{ item.mode }}" # 그룹에 r-x 권한 부여
+    #     # owner는 project_owner 유지
+    #   loop:
+    #     - { path: "{{ project_root_dir }}", mode: '0750' } # u=rwx, g=rx, o=---
+    #     - { path: "{{ project_root_dir }}/staticfiles", mode: '0750' } # 또는 0755 nếu other 읽기 허용
+    #     - { path: "{{ project_root_dir }}/mediafiles", mode: '0750' }  # 또는 0755
+    #     - { path: "{{ venv_dir }}", mode: '0750' }
+    #   become: yes
 
-    #- name: Download Apache config template from GitHub
-    #  get_url:
-    #    url: "{{ apache_conf_template_download_url }}"
-    #    dest: "{{ vm_templates_dir }}/{{ apache_conf_template_downloaded_filename }}"
-    #    mode: '0644'
 
+    # --- Apache 가상 호스트 설정 ---
     - name: Download Apache config template to /tmp on VM
       get_url:
         url: "{{ apache_conf_template_download_url }}"
-        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래로 직접 다운로드
+        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
-      # register, until 등은 유지 가능
+      # delegate_to: localhost # 원격지(/tmp)에 다운로드
 
-    - name: Debug key variables before Apache conf deployment
-      debug:
-        msg:
-          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          - "OS Family: {{ ansible_os_family }}"
-          - "Decoded Template Preview: {{ (apache_template_content_b64.content | b64decode)[:300] if apache_template_content_b64.content is defined else 'TEMPLATE CONTENT NOT SLURPED' }}"
-          - "apache_wsgi_daemon_name: {{ apache_wsgi_daemon_name | default('NOT DEFINED') }}"
-          - "apache_user: {{ apache_user | default('NOT DEFINED') }}"
-          - "apache_group: {{ apache_group | default('NOT DEFINED') }}"
-          - "venv_dir: {{ venv_dir | default('NOT DEFINED') }}"
-          - "project_root_dir: {{ project_root_dir | default('NOT DEFINED') }}"
-          - "server_name_ip: {{ server_name_ip | default('NOT DEFINED') }}" # 이 변수도 vars에 정의 필요
-          - "django_project_name: {{ django_project_name | default('NOT DEFINED') }}"
-          - "django_project_config_name: {{ django_project_config_name | default('NOT DEFINED') }}"
-          - "apache_conf_dir: {{ apache_conf_dir | default('NOT DEFINED FROM VARS') }}"
-          - "Template source path for template module: /tmp/{{ apache_conf_template_downloaded_filename }}"
-
-    - name: Deploy Apache virtual host configuration for Django (using template module)
+    - name: Deploy Apache virtual host configuration for Django
       template:
-        src: "/tmp/{{ apache_conf_template_downloaded_filename }}" # /tmp 아래의 파일 직접 지정
-        remote_src: yes  # VM 내의 파일을 소스로 사용함을 명시
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
+        src: "/tmp/{{ apache_conf_template_downloaded_filename }}"
+        remote_src: yes # VM 내의 파일을 소스로 사용
+        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf" # OS별 conf.d 또는 sites-available
         owner: root
         group: root
         mode: '0644'
       notify: Restart Apache
+      vars: # 템플릿에 전달할 변수 명시 (플레이북 vars와 템플릿 변수 이름이 동일하면 자동 전달되기도 함)
+        apache_wsgi_daemon_name: "{{ apache_wsgi_daemon_name }}"
+        apache_user: "{{ apache_user }}" # OS별 웹서버 유저
+        apache_group: "{{ apache_group }}" # OS별 웹서버 그룹
+        venv_dir: "{{ venv_dir }}"
+        project_root_dir: "{{ project_root_dir }}"
+        server_name_ip: "{{ server_name_ip }}"
+        django_project_name: "{{ django_project_name }}"
+        django_project_config_name: "{{ django_project_config_name }}"
+        apache_log_dir: "{{ apache_log_dir }}" # OS별 로그 디렉토리
 
     - name: Clean up downloaded Apache template file from /tmp
       file:
         path: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         state: absent
+      # delegate_to: localhost
 
+    # Debian 계열 사이트 활성화/비활성화 (기존 로직 유지)
     - name: Disable default Apache site (Debian family only)
-      command: "a2dissite 000-default.conf"
+      command: a2dissite 000-default.conf
       args:
-        removes: "/etc/apache2/sites-enabled/000-default.conf"
-      when: ansible_os_family == "Debian"
-      notify: Restart Apache # 기본 사이트 비활성화 후에도 Apache 재시작 필요
-      changed_when: "'disabled' in disable_default_site_result.stdout" # a2dissite 출력 기반 (선택적 개선)
-      register: disable_default_site_result # 실행 결과를 등록 (선택적 개선)
-      ignore_errors: yes
-      
+        removes: "{{ apache_sites_enabled_dir }}/000-default.conf" # OS별 변수 사용
+      when: ansible_os_family == "Debian" and apache_sites_enabled_dir is defined and apache_sites_enabled_dir != ""
+      notify: Restart Apache
+      register: disable_default_site_result
+      changed_when: "'disabled' in disable_default_site_result.stdout"
+      ignore_errors: yes # 이미 비활성화된 경우 대비
 
-    - name: Enable Apache site (Debian family only)
+    - name: Enable Apache site for Django (Debian family only)
       command: "a2ensite {{ django_project_name }}"
       args:
-        creates: "{{ apache_sites_enabled_dir }}/{{ django_project_name }}.conf" # OS별 활성화된 사이트 경로
-      when: ansible_os_family == "Debian"
+        creates: "{{ apache_sites_enabled_dir }}/{{ django_project_name }}.conf" # OS별 변수 사용
+      when: ansible_os_family == "Debian" and apache_sites_enabled_dir is defined and apache_sites_enabled_dir != ""
       notify: Restart Apache
+      changed_when: true # a2ensite는 변경 시 보통 0을 반환, creates로 멱등성 확보
 
     - name: Ensure Apache service is enabled and running
       service:
-        name: "{{ apache_service_name }}" # OS별 서비스 이름 사용
+        name: "{{ apache_service_name }}" # OS별 서비스 이름
         state: started
         enabled: yes
 
-# Ansible 플레이북의 SELinux 설정 블록
-    - name: Configure SELinux for Apache (RedHat family only)
+    # --- SELinux 설정 (RedHat 계열) ---
+    - name: Configure SELinux for Apache serving from user home (RedHat family only)
       block:
-        #- name: Ensure policycoreutils-python is installed for semanage/sefcontext
-          #yum:
-            #name: "{{ policycoreutils_package_name }}" # vars/RedHat.yml 에 "policycoreutils-python" 또는 "policycoreutils-python-utils" 정의 필요
-            #state: present
+        - name: Ensure policycoreutils-python-utils is installed for semanage/sefcontext
+          yum:
+            name: "{{ policycoreutils_package_name | default('policycoreutils-python-utils') }}" # RedHat.yml에 정의된 것 사용
+            state: present
+          when: policycoreutils_package_name is defined and policycoreutils_package_name != ""
 
-        - name: Allow httpd to access project files (SELinux context)
+        - name: Allow httpd to access project files in user home (SELinux context)
           sefcontext:
-            target: "{{ project_root_dir }}(/.*)?" # 예: /var/www/onpremweb(/.*)?
+            target: "{{ project_root_dir }}(/.*)?" # 예: /home/vagrant/onpremweb_app(/.*)?
             setype: httpd_sys_content_t
             state: present
           notify: Restore SELinux context
 
-        # 만약 Django가 파일을 쓰는 디렉토리 (예: media_root, SQLite DB 파일 경로 등)가 있다면
-        # 해당 경로에 httpd_sys_rw_content_t 컨텍스트 부여 필요
         - name: Allow httpd to write to media directory (SELinux context)
           sefcontext:
             target: "{{ project_root_dir }}/mediafiles(/.*)?"
-            setype: httpd_sys_rw_content_t
+            setype: httpd_sys_rw_content_t # Django가 미디어 파일 업로드 시 필요
             state: present
           notify: Restore SELinux context
-
-        - name: Allow httpd to access user home directories (if project was in user home) - 현재는 /var/www 이므로 불필요할 수 있음
+        
+        - name: Allow httpd to access user home directories (SELinux boolean)
           seboolean:
-            name: httpd_enable_homedirs # 이 boolean은 /home/*/public_html 등에 대한 것
+            name: httpd_enable_homedirs
             state: yes
-            persistent: yes
+            persistent: yes # 재부팅 후에도 유지
 
-        - name: Allow httpd to make network connections (if needed for DB, external APIs, etc.)
+        - name: Allow httpd to make network connections (if Django needs to connect to external services)
           seboolean:
             name: httpd_can_network_connect
             state: yes
             persistent: yes
+        
+        # SQLite는 로컬 파일이므로 httpd_can_network_connect_db는 필수 아님.
+        # 외부 DB 사용 시 필요.
+        # - name: Allow httpd to connect to databases (if using external DB)
+        #   seboolean:
+        #     name: httpd_can_network_connect_db
+        #     state: yes
+        #     persistent: yes
 
-        # 만약 데이터베이스 연결이 필요하다면 (SQLite는 로컬 파일이므로 이 boolean은 불필요)
-        - name: Allow httpd to connect to databases
-          seboolean:
-            name: httpd_can_network_connect_db
-            state: yes
-            persistent: yes
-
-      when: ansible_os_family == "RedHat"
-      ignore_errors: yes # semanage/seboolean 모듈 실행 실패 대비 (패키지 미설치 등)
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled" # SELinux 활성화 시에만 실행
+      ignore_errors: yes # semanage/seboolean 관련 오류 발생 시 플레이북 중단 방지 (디버깅 필요)
 
   handlers:
     - name: Restart Apache
       service:
-        name: "{{ apache_service_name }}"
+        name: "{{ apache_service_name }}" # OS별 서비스 이름 사용
         state: restarted
+      become: yes
 
     - name: Restore SELinux context
       command: "restorecon -Rv {{ project_root_dir }}"
-      when: ansible_os_family == "RedHat"
-
-    - name: Reload firewalld
-      service:
-        name: firewalld
-        state: reloaded
-      when: ansible_os_family == "RedHat"
-
-    - name: Reload ufw
-      command: ufw reload # 또는 service 모듈 사용 (ufw 서비스가 systemd로 관리된다면)
-      when: ansible_os_family == "Debian"
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
+      become: yes
 
     - name: Restore wsgi socket dir SELinux context
-      command: "restorecon -Rv /var/run/wsgi"
-      when: ansible_os_family == "RedHat"
+      command: "restorecon -Rv /var/run/wsgi" # WSGISocketPrefix 경로
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
+      become: yes
+
+    # Firewall 핸들러는 현재 플레이북에서 직접 사용되지 않으므로 생략 가능 (필요시 추가)
