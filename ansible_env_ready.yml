@@ -503,82 +503,46 @@
             name: "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
             state: present
 
-        # --- SELinux Booleans 설정 및 확인 ---
-        - name: Get initial httpd_enable_homedirs status
+        # --- SELinux Booleans 설정 (command 모듈 사용) ---
+        - name: Set httpd_enable_homedirs to on using command
+          command: setsebool -P httpd_enable_homedirs on
+          register: result_set_homedirs
+          changed_when: "'httpd_enable_homedirs is now on' in result_set_homedirs.stdout or result_set_homedirs.rc == 0" # 성공 조건 명확화
+          failed_when: result_set_homedirs.rc != 0
+          # ignore_errors: no # 실패 시 중단
+
+        - name: Set httpd_execmem to on using command
+          command: setsebool -P httpd_execmem on
+          register: result_set_execmem
+          changed_when: "'httpd_execmem is now on' in result_set_execmem.stdout or result_set_execmem.rc == 0"
+          failed_when: result_set_execmem.rc != 0
+          # ignore_errors: no
+
+        - name: Set httpd_can_network_connect to on using command
+          command: setsebool -P httpd_can_network_connect on
+          register: result_set_network_connect
+          changed_when: "'httpd_can_network_connect is now on' in result_set_network_connect.stdout or result_set_network_connect.rc == 0"
+          failed_when: result_set_network_connect.rc != 0
+          # ignore_errors: no
+
+        # --- SELinux Boolean 상태 확인 (필수) ---
+        - name: Verify httpd_enable_homedirs status after command set
           command: getsebool httpd_enable_homedirs
-          register: initial_httpd_enable_homedirs
+          register: check_httpd_enable_homedirs
           changed_when: false
-          ignore_errors: yes # getsebool이 실패할 수도 있으므로 (매우 드묾)
-
-        - name: Debug initial httpd_enable_homedirs status
-          debug:
-            var: initial_httpd_enable_homedirs.stdout
-          when: initial_httpd_enable_homedirs.rc == 0
-
-        - name: Set httpd_enable_homedirs to on
-          seboolean:
-            name: httpd_enable_homedirs # 문자열로 이름 전달
-            state: "yes" # 문자열 "yes" 또는 true/on
-            persistent: yes
-          register: result_httpd_enable_homedirs
-          ignore_errors: no # <--- 실패 원인 확인 위해 no
-
-        - name: Debug httpd_enable_homedirs set result
-          debug:
-            var: result_httpd_enable_homedirs
-
-        - name: Verify httpd_enable_homedirs status AFTER set
-          command: getsebool httpd_enable_homedirs
-          register: final_httpd_enable_homedirs
-          changed_when: false
-          ignore_errors: yes
 
         - name: Debug FINAL httpd_enable_homedirs status
           debug:
-            var: final_httpd_enable_homedirs.stdout
-          when: final_httpd_enable_homedirs.rc == 0
+            var: check_httpd_enable_homedirs.stdout
 
-
-        - name: Get initial httpd_execmem status
+        - name: Verify httpd_execmem status after command set
           command: getsebool httpd_execmem
-          register: initial_httpd_execmem
+          register: check_httpd_execmem
           changed_when: false
-          ignore_errors: yes
-
-        - name: Debug initial httpd_execmem status
-          debug:
-            var: initial_httpd_execmem.stdout
-          when: initial_httpd_execmem.rc == 0
-
-        - name: Set httpd_execmem to on
-          seboolean:
-            name: httpd_execmem # 문자열로 이름 전달
-            state: "yes"
-            persistent: yes
-          register: result_httpd_execmem
-          ignore_errors: no # <--- 실패 원인 확인 위해 no
-
-        - name: Debug httpd_execmem set result
-          debug:
-            var: result_httpd_execmem
-
-        - name: Verify httpd_execmem status AFTER set
-          command: getsebool httpd_execmem
-          register: final_httpd_execmem
-          changed_when: false
-          ignore_errors: yes
 
         - name: Debug FINAL httpd_execmem status
           debug:
-            var: final_httpd_execmem.stdout
-          when: final_httpd_execmem.rc == 0
-
-        - name: Set httpd_can_network_connect to on # 필요시
-          seboolean:
-            name: httpd_can_network_connect # 문자열로 이름 전달
-            state: "yes"
-            persistent: yes
-          ignore_errors: no # 필요시
+            var: check_httpd_execmem.stdout
 
         # --- SELinux File Contexts 정의 ---
         - name: Define SELinux context for project root (read-only content)
