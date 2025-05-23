@@ -1,6 +1,7 @@
 # templates/django_onpremweb.conf.j2
 
-#WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5
+# WSGIDaemonProcess는 project_owner가 아닌 apache_user로 실행되어야 함
+# python-home은 venv_dir, python-path는 project_root_dir
 WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5 display-name=%{GROUP}
 
 <VirtualHost *:80>
@@ -31,4 +32,16 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ 
     <Directory {{ project_root_dir }}/mediafiles>
         Require all granted
     </Directory>
+
+    # Apache가 사용자 홈 디렉토리 내의 파일에 접근하기 위한 권한 설정 (필요시)
+    # 이 설정은 파일 시스템 권한 및 SELinux/AppArmor 설정과 함께 작동해야 함
+    <Directory {{ project_base_dir }}>
+        Require all granted # 매우 관대한 설정, 보안상 주의. 특정 경로로 제한하는 것이 좋음
+        Options FollowSymLinks Indexes # 필요에 따라 조정
+    </Directory>
+    <Directory {{ project_root_dir }}>
+        Require all granted
+        Options FollowSymLinks Indexes
+    </Directory>
+
 </VirtualHost>
