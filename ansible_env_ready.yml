@@ -216,15 +216,12 @@
 
     # Apache 템플릿 다운로드 설정
     github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
-    download_base_dir: "{{ ansible_user_dir | default('/tmp') }}" # 임시 다운로드 기본 경로
-    downloaded_templates_dir: "{{ download_base_dir }}/downloaded_apache_templates" # 고유한 이름 사용
+    download_base_dir: "{{ ansible_user_dir | default('/tmp') }}"
+    downloaded_templates_dir: "{{ download_base_dir }}/downloaded_apache_templates"
     apache_conf_template_filename: "django_onpremweb.conf.j2"
     downloaded_apache_conf_path: "{{ downloaded_templates_dir }}/{{ apache_conf_template_filename }}"
 
-    # server_name_ip는 첫 번째 플레이에서 set_fact로 설정된 OS별 IP 또는 기본값 사용
-    server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }} 
-    
-    # apache_user, apache_group, apache_conf_dir 등 OS별 변수는 첫 번째 플레이에서 로드됨
+    server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
 
   tasks:
     # --- Apache 템플릿 다운로드 디렉터리 생성 ---
