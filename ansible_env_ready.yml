@@ -641,7 +641,15 @@
         state: restarted
       become: yes
 
-    - name: Restore wsgi socket dir SELinux context # 이것은 유지 (WSGI 소켓 디렉터리는 별도 경로)
+    # - name: Restore SELinux context for project_root # <--- 주석 처리 또는 삭제
+    #   command: "restorecon -Rv {{ project_root_dir }}"
+    #   # ...
+
+    # - name: Restore SELinux context for venv # <--- 주석 처리 또는 삭제
+    #   command: "restorecon -Rv {{ venv_dir }}"
+    #   # ...
+
+    - name: Restore wsgi socket dir SELinux context # 이것은 유지
       command: "restorecon -Rv /var/run/wsgi"
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       become: yes
