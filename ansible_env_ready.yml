@@ -24,10 +24,10 @@
         # IUS 패키지명 규칙은 보통 python<버전숫자><u 또는 다른 접미사>
     # 예: python39, python310u
     # 정확한 패키지명은 `yum search python3 | grep ius` 등으로 확인 필요
-    python_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', 'python39') }}" # 예: python39
-    pip_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', 'python39') }}-pip"
-    devel_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', 'python39') }}-devel"
-    venv_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', 'python39') }}-virtualenv" # 또는 새 python의 내장 venv 사용
+    python_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', '') }}" # 예: python39
+    pip_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', '') }}-pip"
+    devel_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', '') }}-devel"
+    venv_target_package_name_rh: "python{{ python_target_version_short | replace('3.9', '') }}-virtualenv" # 또는 새 python의 내장 venv 사용
 
   tasks:
     - name: Create directory for downloaded OS vars files
