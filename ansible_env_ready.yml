@@ -14,15 +14,15 @@
 
     # OS별 변수 파일 다운로드 설정
     github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
+    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
     # ansible_user_dir은 gather_facts로 수집 (플레이북 실행 사용자 홈)
     download_base_dir: "{{ ansible_user_dir | default('/tmp') }}" # 임시 다운로드 기본 경로
-    downloaded_os_vars_dir: "{{ download_base_dir }}/downloaded_os_vars_from_playbook" # 고유한 이름 사용
+    downloaded_os_vars_dir: "/tmp/downloaded_os_vars_pb_{{ ansible_date_time.epoch }}"
 
-    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
 
   tasks:
     # --- OS별 변수 파일 다운로드 디렉터리 생성 ---
-    - name: Create directory for downloaded OS vars files
+    - name: Create directory for downloaded OS vars files in /tmp
       file:
         path: "{{ downloaded_os_vars_dir }}"
         state: directory
@@ -220,7 +220,7 @@
     # Apache 템플릿 다운로드 설정
     github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
     download_base_dir: "{{ ansible_user_dir | default('/tmp') }}"
-    downloaded_templates_dir: "{{ download_base_dir }}/downloaded_apache_templates"
+    downloaded_templates_dir: "/tmp/downloaded_apache_templates_pb_{{ ansible_date_time.epoch }}"
     apache_conf_template_filename: "django_onpremweb.conf.j2"
     downloaded_apache_conf_path: "{{ downloaded_templates_dir }}/{{ apache_conf_template_filename }}"
 
