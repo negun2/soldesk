@@ -506,17 +506,42 @@
 
         - name: Allow httpd to access project files in user home (SELinux context)
           sefcontext:
-            target: "{{ project_root_dir }}(/.*)?"
+            target: "{{ project_root_dir }}(/.*)?" # 사용자 홈 밑의 프로젝트 경로
             setype: httpd_sys_content_t
             state: present
           notify: Restore SELinux context
 
         - name: Allow httpd to write to media directory (SELinux context)
           sefcontext:
-            target: "{{ project_root_dir }}/mediafiles(/.*)?"
+            target: "{{ project_root_dir }}/mediafiles(/.*)?" # 사용자 홈 밑의 미디어 경로
             setype: httpd_sys_rw_content_t
             state: present
           notify: Restore SELinux context
+
+        # vvvvvvvvvvvvvvvv 이 아래에 새로운 SELinux 설정 추가 vvvvvvvvvvvvvvvv
+        - name: Allow httpd to access venv directory contents (SELinux context) # <--- 새 태스크 1
+          sefcontext:
+            target: "{{ venv_dir }}(/.*)?" # 가상 환경 디렉토리 전체
+            setype: httpd_sys_content_t   # 우선 읽기 가능한 컨텍스트 부여
+                                          # 또는 스크립트가 많다면 httpd_sys_script_ro_t
+            state: present
+          notify: Restore SELinux context # 기존 핸들러 재사용 가능 (project_root_dir 포함하므로)
+                                          # 또는 별도 venv_dir용 restorecon 핸들러 생성
+
+        - name: Allow httpd to execute mod_wsgi.so from venv (SELinux context)
+          sefcontext:
+            target: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}(/.*)?" # 경로 추출 후 뒤에 (/.*)?는 보통 파일에는 불필요, 정확히 파일 지정
+            # 또는 target: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
+            # 정규식 사용 시:
+            # target: "{{ (mod_wsgi_config_output.stdout_lines[0] | regex_replace('^LoadModule\\\\s\\\\w\\\\s\\\\"(.*)\\\\"$', '\\\\1')) }}"
+            setype: httpd_sys_script_exec_t
+            state: present
+          notify: Restore SELinux context for venv
+          when:
+            - ansible_os_family == "RedHat"
+            - ansible_selinux.status == "enabled"
+            - mod_wsgi_config_output.stdout_lines is defined
+            - mod_wsgi_config_output.stdout_lines | length > 0
 
         - name: Allow httpd to access user home directories (SELinux boolean)
           seboolean:
@@ -529,6 +554,14 @@
             name: httpd_can_network_connect
             state: yes
             persistent: yes
+    
+        - name: Allow Apache to execute code from memory (if needed for mod_wsgi) # <--- 새 boolean (필요시)
+          seboolean:
+            name: httpd_execmem
+            state: yes
+            persistent: yes
+          when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"    
+  
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       ignore_errors: yes
 
@@ -546,12 +579,17 @@
         state: restarted
       become: yes
 
-    - name: Restore SELinux context
+    - name: Restore SELinux context # 기존 핸들러 (project_root_dir)
       command: "restorecon -Rv {{ project_root_dir }}"
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       become: yes
 
     - name: Restore wsgi socket dir SELinux context
       command: "restorecon -Rv /var/run/wsgi"
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
+      become: yes
+
+    - name: Restore SELinux context for venv # <--- 새 핸들러 또는 기존 핸들러에 경로 추가
+      command: "restorecon -Rv {{ venv_dir }}" # venv 디렉토리 전체에 대해 restorecon
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       become: yes
