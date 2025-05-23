@@ -227,7 +227,7 @@
     server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
 
   tasks:
-    - name: Debug OS Family and SELinux Status
+    - name: Debug OS Family and SELinux Status before SELinux block
       debug:
         msg:
           - "OS Family: {{ ansible_os_family }}"
@@ -515,7 +515,12 @@
       register: apache_test
       failed_when: apache_test.rc != 0
     
-
+    - name: Debug OS Family and SELinux Status before SELinux block
+      debug:
+        msg:
+          - "OS Family: {{ ansible_os_family }}"
+          - "SELinux Status: {{ ansible_selinux.status | default('Not defined') }}"
+          - "Is RedHat and SELinux enabled? {{ (ansible_os_family == 'RedHat' and ansible_selinux.status == 'enabled') | bool }}"
 
 # --- SELinux 설정 ---
     - name: Configure SELinux for Apache serving from user home (RedHat family only)
