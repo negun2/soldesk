@@ -222,6 +222,8 @@
     downloaded_apache_conf_path: "{{ downloaded_templates_dir }}/{{ apache_conf_template_filename }}"
 
     # server_name_ip는 첫 번째 플레이에서 set_fact로 설정된 OS별 IP 또는 기본값 사용
+    server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }} 
+    
     # apache_user, apache_group, apache_conf_dir 등 OS별 변수는 첫 번째 플레이에서 로드됨
 
   tasks:
