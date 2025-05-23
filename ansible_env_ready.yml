@@ -222,6 +222,16 @@
 
   tasks:
     # --- 프로젝트 디렉토리 생성 (소유자는 target_project_user) ---
+    - name: Debug initial user and path variables
+      debug:
+        msg:
+          - "ansible_user_id: {{ ansible_user_id }}"
+          - "ansible_user_dir: {{ ansible_user_dir }}"
+          - "target_project_user: {{ target_project_user }}"
+          - "target_project_user_home: {{ target_project_user_home }}"
+          - "project_base_dir: {{ project_base_dir }}"
+          - "project_root_dir: {{ project_root_dir }}"
+          - "venv_dir: {{ venv_dir }}"    
     - name: Ensure project base directory (user's home) exists
       file:
         path: "{{ project_base_dir }}"
