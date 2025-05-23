@@ -529,14 +529,13 @@
                                           # 또는 별도 venv_dir용 restorecon 핸들러 생성
 
         - name: Allow httpd to execute mod_wsgi.so from venv (SELinux context)
+          vars:
+            mod_wsgi_so_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
           sefcontext:
-            target: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}(/.*)?" # 경로 추출 후 뒤에 (/.*)?는 보통 파일에는 불필요, 정확히 파일 지정
-            # 또는 target: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
-            # 정규식 사용 시:
-            # target: "{{ (mod_wsgi_config_output.stdout_lines[0] | regex_replace('^LoadModule\\\\s\\\\w\\\\s\\\\"(.*)\\\\"$', '\\\\1')) }}"
+            target: "{{ mod_wsgi_so_path }}" # (/.*)? 제거
             setype: httpd_sys_script_exec_t
             state: present
-          notify: Restore SELinux context for venv
+          notify: Restore SELinux context for mod_wsgi so file # 핸들러 이름 변경 또는 특정 파일에 대한 restorecon
           when:
             - ansible_os_family == "RedHat"
             - ansible_selinux.status == "enabled"
@@ -589,7 +588,7 @@
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       become: yes
 
-    - name: Restore SELinux context for venv # <--- 새 핸들러 또는 기존 핸들러에 경로 추가
-      command: "restorecon -Rv {{ venv_dir }}" # venv 디렉토리 전체에 대해 restorecon
+    - name: Restore SELinux context for venv # 기존 핸들러 이름을 사용하고, .so 파일에도 적용되도록 venv 전체에 실행
+      command: "restorecon -Rv {{ venv_dir }}"
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
       become: yes
