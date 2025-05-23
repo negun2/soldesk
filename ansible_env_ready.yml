@@ -514,13 +514,13 @@
             - { name: 'httpd_execmem', state: 'yes' }
             - { name: 'httpd_can_network_connect', state: 'yes' }
           register: seboolean_results
-          # ignore_errors: yes # <--- 디버깅을 위해 일시적으로 주석 처리 또는 no로 변경
+          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
 
         - name: Debug seboolean results
           debug:
             var: seboolean_results
 
-        - name: Verify httpd_enable_homedirs status
+        - name: Verify httpd_enable_homedirs status after set
           command: getsebool httpd_enable_homedirs
           register: check_httpd_enable_homedirs
           changed_when: false
@@ -529,7 +529,7 @@
           debug:
             var: check_httpd_enable_homedirs.stdout
 
-        - name: Verify httpd_execmem status
+        - name: Verify httpd_execmem status after set
           command: getsebool httpd_execmem
           register: check_httpd_execmem
           changed_when: false
@@ -554,7 +554,7 @@
         - name: Define SELinux context for venv directory (readable content)
           sefcontext:
             target: "{{ venv_dir }}(/.*)?"
-            setype: httpd_sys_content_t # venv 내부 파일 읽기 허용
+            setype: httpd_sys_content_t
             state: present
 
         - name: Define SELinux context for mod_wsgi.so (executable script/library)
@@ -562,7 +562,7 @@
             mod_wsgi_so_file_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
           sefcontext:
             target: "{{ mod_wsgi_so_file_path }}" # 정확한 .so 파일 경로
-            setype: httpd_sys_script_exec_t # 실행 가능한 라이브러리
+            setype: httpd_sys_script_exec_t
             state: present
           when: mod_wsgi_config_output.stdout_lines is defined and mod_wsgi_config_output.stdout_lines | length > 0
 
@@ -573,15 +573,17 @@
             - "{{ project_root_dir }}" # mediafiles 포함
             - "{{ venv_dir }}"         # mod_wsgi.so 포함
           register: restorecon_results
-          changed_when: "'Relabeled' in restorecon_results.stdout" # 실제 변경이 있을 때만 changed
-          # ignore_errors: yes # 디버깅 중에는 no 또는 register/failed_when 사용 고려
+          changed_when: "'Relabeled' in restorecon_results.stdout or restorecon_results.rc != 0" # 변경 또는 오류 시 changed
+          failed_when: restorecon_results.rc != 0 and 'No such file or directory' not in restorecon_results.stderr # 파일 없음 외의 오류는 실패
+          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
 
         - name: Debug restorecon results
           debug:
             var: restorecon_results
+            verbosity: 1 # stdout/stderr도 보이도록
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # ignore_errors: yes # 블록 전체에 대한 ignore_errors는 최후에
+      # ignore_errors: yes # 블록 전체 ignore_errors는 최후에 고려
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
@@ -600,4 +602,4 @@
     - name: Restore wsgi socket dir SELinux context # 이것은 유지 (WSGI 소켓 디렉터리는 별도 경로)
       command: "restorecon -Rv /var/run/wsgi"
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      become: yes
+      become: yesㄴ
