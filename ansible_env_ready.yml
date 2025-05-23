@@ -573,32 +573,52 @@
             persistent: yes
           ignore_errors: no
 
-        # --- SELinux File Contexts 정의 (이전과 동일하게 유지) ---
+        # --- SELinux File Contexts 정의 ---
         - name: Define SELinux context for project root (read-only content)
-          sefcontext: # ...
-        - name: Define SELinux context for media directory (writable content)
-          sefcontext: # ...
-        - name: Define SELinux context for venv directory (readable content)
-          sefcontext: # ...
-        - name: Define SELinux context for mod_wsgi.so (executable script/library)
-          vars: # ...
-          sefcontext: # ...
-          when: # ...
+          sefcontext:
+            target: "{{ project_root_dir }}(/.*)?"
+            setype: httpd_sys_content_t
+            state: present
 
-        # --- SELinux 컨텍스트 즉시 적용 (이전과 동일하게 유지) ---
+        - name: Define SELinux context for media directory (writable content)
+          sefcontext:
+            target: "{{ project_root_dir }}/mediafiles(/.*)?"
+            setype: httpd_sys_rw_content_t
+            state: present
+
+        - name: Define SELinux context for venv directory (readable content)
+          sefcontext:
+            target: "{{ venv_dir }}(/.*)?"
+            setype: httpd_sys_content_t
+            state: present
+
+        - name: Define SELinux context for mod_wsgi.so (executable script/library)
+          vars:
+            mod_wsgi_so_file_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
+          sefcontext:
+            target: "{{ mod_wsgi_so_file_path }}" # 정확한 .so 파일 경로
+            setype: httpd_sys_script_exec_t
+            state: present
+          when: mod_wsgi_config_output.stdout_lines is defined and mod_wsgi_config_output.stdout_lines | length > 0
+
+        # --- SELinux 컨텍스트 즉시 적용 ---
         - name: Apply SELinux context to project directories and venv
-          command: # ...
-          loop: # ...
-          register: # ...
-          changed_when: # ...
-          failed_when: # ...
-          ignore_errors: no
+          command: "restorecon -Rv {{ item }}"
+          loop:
+            - "{{ project_root_dir }}" # mediafiles 포함
+            - "{{ venv_dir }}"         # mod_wsgi.so 포함
+          register: restorecon_results
+          changed_when: "'Relabeled' in restorecon_results.stdout or restorecon_results.rc != 0" # 변경 또는 오류 시 changed
+          failed_when: restorecon_results.rc != 0 and 'No such file or directory' not in restorecon_results.stderr # 파일 없음 외의 오류는 실패
+          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
 
         - name: Debug restorecon results
-          debug: # ...
+          debug:
+            var: restorecon_results
+            verbosity: 1 # stdout/stderr도 보이도록
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # ignore_errors: yes # 블록 전체 ignore_errors는 SELinux 문제 완전히 해결 후 고려
+      # ignore_errors: yes # 블록 전체 ignore_errors는 최후에 고려
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
