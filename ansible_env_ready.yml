@@ -439,17 +439,17 @@
         group: root
         mode: '0644'
       notify: Restart Apache
-      vars:
-        apache_wsgi_daemon_name: "{{ apache_wsgi_daemon_name }}"
-        apache_user: "{{ apache_user }}"
-        apache_group: "{{ apache_group }}"
-        venv_dir: "{{ venv_dir }}" # 사용자 홈 밑의 venv 경로
-        project_root_dir: "{{ project_root_dir }}" # 사용자 홈 밑의 프로젝트 경로
-        project_base_dir: "{{ project_base_dir }}" # 사용자 홈 경로 (템플릿에서 사용 시)
-        server_name_ip: "{{ server_name_ip }}"
-        django_project_name: "{{ django_project_name }}"
-        django_project_config_name: "{{ django_project_config_name }}"
-        apache_log_dir: "{{ apache_log_dir }}" # OS별 Apache 로그 디렉토리 (from vars)
+      #vars:
+        #apache_wsgi_daemon_name: "{{ apache_wsgi_daemon_name }}"
+        #apache_user: "{{ apache_user }}"
+        #apache_group: "{{ apache_group }}"
+        #venv_dir: "{{ venv_dir }}" # 사용자 홈 밑의 venv 경로
+        #project_root_dir: "{{ project_root_dir }}" # 사용자 홈 밑의 프로젝트 경로
+        #project_base_dir: "{{ project_base_dir }}" # 사용자 홈 경로 (템플릿에서 사용 시)
+        #server_name_ip: "{{ server_name_ip }}"
+        #django_project_name: "{{ django_project_name }}"
+        #django_project_config_name: "{{ django_project_config_name }}"
+        #apache_log_dir: "{{ apache_log_dir }}" # OS별 Apache 로그 디렉토리 (from vars)
 
     - name: Clean up downloaded Apache template file from /tmp
       file:
