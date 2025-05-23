@@ -146,8 +146,9 @@
     # ansible_user_id 는 연결 사용자의 이름 (e.g., vagrant, ec2-user)
     # ansible_user_dir 은 해당 사용자의 홈 디렉토리 (e.g., /home/vagrant)
     # gather_facts: yes 로 수집됨.
-    project_owner: "{{ ansible_user_id | default(lookup('env', 'USER')) }}"
-    project_owner_home: "{{ ansible_user_dir | default(lookup('env', 'HOME')) }}"
+    project_owner: "{{ ansible_user_id | default(lookup('env', 'USER')) }}" # ansible_user_id가 root이면 project_owner는 root
+    project_owner_home: "{{ ansible_user_dir | default(lookup('env', 'HOME')) }}" # ansible_user_dir이 /root이면 project_owner_home은 /root
+    # 따라서 project_owner는 'root'가 되고 project_root_dir은 '/root/onpremweb_app'가 됩니다.
 
     # --- 프로젝트 경로 및 설정 ---
     django_project_name: "onpremweb" # 프로젝트 애플리케이션 이름 (디렉토리명, 설정 파일명 등에 사용)
@@ -211,18 +212,18 @@
       pip:
         name: wheel
         virtualenv: "{{ venv_dir }}"
-        # virtualenv_command: "{{ venv_dir }}/bin/python -m pip" # 명시적 pip 경로
-      become: yes # pip 실행은 root로 하되, 가상환경은 project_owner 소유
-      # 또는 become_user: "{{ project_owner }}" (권한 문제 없을 시)
+      become: yes
+      # become_user: "{{ project_owner }}" # project_owner가 root이므로 become:yes로 충분
 
-    - name: Install Django and mod_wsgi in virtual environment
+    - name: Install Django, mod_wsgi, and pysqlite3-binary in virtual environment # <--- pysqlite3-binary 추가
       pip:
         name:
           - "django=={{ django_version }}"
           - mod_wsgi
+          - pysqlite3-binary # <--- 이 패키지를 추가합니다.
         virtualenv: "{{ venv_dir }}"
       become: yes
-      # 또는 become_user: "{{ project_owner }}"
+      # become_user: "{{ project_owner }}"
 
     # --- Apache mod_wsgi 설정 ---
     # RedHat: /etc/httpd/conf.modules.d/10-wsgi-custom.conf
