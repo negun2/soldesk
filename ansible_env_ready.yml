@@ -84,7 +84,7 @@
           - "{{ apache_package_name | default(omit) }}"    # From RedHat.yml (e.g., httpd)
           - "{{ apache_dev_package_name | default(omit) }}" # From RedHat.yml (e.g., httpd-devel)
           #- "{{ mod_wsgi_package_name_system | default(omit) }}" # From RedHat.yml (e.g., python3-mod_wsgi) - pip으로 설치하므로 없어도 무방
-          - "{{ python_virtualenv_package_name | default(omit) }}" # From RedHat.yml (e.g., python3-virtualenv)
+          #- "{{ python_virtualenv_package_name | default(omit) }}" # From RedHat.yml (e.g., python3-virtualenv)
           - wget
           - "{{ readline_dev_package_name | default(omit) }}" # From RedHat.yml
           - "{{ zlib_dev_package_name | default(omit) }}"     # From RedHat.yml
