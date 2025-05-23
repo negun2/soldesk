@@ -498,70 +498,66 @@
     # --- SELinux 설정 ---
     - name: Configure SELinux for Apache serving from user home (RedHat family only)
       block:
-        - name: Ensure policycoreutils package is installed for semanage/sefcontext
+        - name: Ensure policycoreutils package is installed
           yum:
             name: "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
             state: present
-          when: policycoreutils_package_name is defined and policycoreutils_package_name != ""
+          # when: 조건은 이미 block 레벨에 있음
 
         # --- SELinux Booleans 설정 ---
-        - name: Allow httpd to access user home directories (SELinux boolean)
+        - name: Set SELinux booleans for Apache
           seboolean:
-            name: httpd_enable_homedirs
+            name: "{{ item }}"
             state: yes
             persistent: yes
+          loop:
+            - httpd_enable_homedirs
+            - httpd_execmem
+            - httpd_can_network_connect
+          # ignore_errors: yes # <--- 디버깅 중에는 no 또는 register/failed_when 사용 고려
 
-        - name: Allow Apache to execute code from memory (for mod_wsgi.so)
-          seboolean:
-            name: httpd_execmem
-            state: yes
-            persistent: yes
-
-        - name: Allow httpd to make network connections (if needed)
-          seboolean:
-            name: httpd_can_network_connect
-            state: yes
-            persistent: yes
-
-        # --- SELinux File Contexts 설정 ---
-        # 프로젝트 루트 디렉토리 및 하위 파일/디렉토리 (일반 콘텐츠용)
-        - name: Allow httpd to read project root and static/media files (SELinux context)
+        # --- SELinux File Contexts 정의 ---
+        - name: Define SELinux context for project root (read-only content)
           sefcontext:
             target: "{{ project_root_dir }}(/.*)?"
-            setype: httpd_sys_content_t # 일반 웹 콘텐츠용
+            setype: httpd_sys_content_t
             state: present
-          notify: Restore SELinux context for project_root # 핸들러 이름 변경 또는 통합
+          # notify 제거, 아래에서 직접 restorecon
 
-        # 미디어 디렉토리 (쓰기 가능해야 함)
-        - name: Allow httpd to write to media directory (SELinux context)
+        - name: Define SELinux context for media directory (writable content)
           sefcontext:
             target: "{{ project_root_dir }}/mediafiles(/.*)?"
-            setype: httpd_sys_rw_content_t # 읽기/쓰기 가능한 웹 콘텐츠
+            setype: httpd_sys_rw_content_t
             state: present
-          notify: Restore SELinux context for project_root
+          # notify 제거
 
-        # 가상 환경 디렉토리 (읽기 및 일부 실행 필요)
-        - name: Allow httpd to access venv directory contents (SELinux context)
+        - name: Define SELinux context for venv directory (readable content)
           sefcontext:
             target: "{{ venv_dir }}(/.*)?"
-            setype: httpd_sys_content_t # 기본적으로 읽기 가능
+            setype: httpd_sys_content_t # venv 자체는 실행 파일이 아니므로 content로
             state: present
-          notify: Restore SELinux context for venv
+          # notify 제거
 
-        # mod_wsgi.so 파일 (실행 가능해야 함)
-        - name: Allow httpd to execute mod_wsgi.so from venv (SELinux context)
+        - name: Define SELinux context for mod_wsgi.so (executable script/library)
           vars:
-            # mod_wsgi.so 파일 경로를 mod_wsgi_config_output에서 추출
             mod_wsgi_so_file_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
           sefcontext:
             target: "{{ mod_wsgi_so_file_path }}" # 정확한 파일 경로
-            setype: httpd_sys_script_exec_t     # 스크립트/라이브러리 실행용
+            setype: httpd_sys_script_exec_t
             state: present
-          notify: Restore SELinux context for venv # venv 핸들러로 .so 파일도 커버 가능
+          # notify 제거
           when: mod_wsgi_config_output.stdout_lines is defined and mod_wsgi_config_output.stdout_lines | length > 0
+        # --- SELinux 컨텍스트 즉시 적용 ---
+        - name: Apply SELinux context to project directories and venv
+          command: "restorecon -Rv {{ item }}"
+          loop:
+            - "{{ project_root_dir }}" # mediafiles는 project_root_dir 하위이므로 함께 적용됨
+            - "{{ venv_dir }}"         # mod_wsgi.so는 venv_dir 하위이므로 함께 적용됨
+          changed_when: true # restorecon은 변경 시 출력이 있으므로 changed로 간주 가능
+          # ignore_errors: yes # <--- 디버깅 중에는 no 또는 register/failed_when 사용 고려
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      ignore_errors: yes # 개별 SELinux 작업 실패 시 플레이북 중단 방지 (디버깅 후 제거 가능)
+      # ignore_errors: yes # block 레벨의 ignore_errors는 최후에 고려
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
@@ -571,23 +567,13 @@
       when: downloaded_templates_dir is defined and downloaded_templates_dir != "/" and downloaded_templates_dir != ansible_user_dir
 
   handlers:
-  - name: Restart Apache
-    service:
-      name: "{{ apache_service_name }}"
-      state: restarted
-    become: yes
+    - name: Restart Apache
+      service:
+        name: "{{ apache_service_name }}"
+        state: restarted
+      become: yes
 
-  - name: Restore SELinux context for project_root # project_root_dir 및 그 하위 (mediafiles 포함)
-    command: "restorecon -Rv {{ project_root_dir }}"
-    when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-    become: yes
-
-  - name: Restore SELinux context for venv # venv_dir 및 그 하위 (mod_wsgi.so 포함)
-    command: "restorecon -Rv {{ venv_dir }}"
-    when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-    become: yes
-
-  - name: Restore wsgi socket dir SELinux context
-    command: "restorecon -Rv /var/run/wsgi"
-    when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-    become: yes
+    - name: Restore wsgi socket dir SELinux context # 이것은 유지 (WSGI 소켓 디렉터리는 별도 경로)
+      command: "restorecon -Rv /var/run/wsgi"
+      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
+      become: yes
