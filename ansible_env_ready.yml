@@ -495,7 +495,7 @@
         state: started
         enabled: yes
 
-    # --- SELinux 설정 ---
+# --- SELinux 설정 ---
     - name: Configure SELinux for Apache serving from user home (RedHat family only)
       block:
         - name: Ensure policycoreutils package is installed
@@ -508,18 +508,20 @@
           command: getsebool httpd_enable_homedirs
           register: initial_httpd_enable_homedirs
           changed_when: false
+          ignore_errors: yes # getsebool이 실패할 수도 있으므로 (매우 드묾)
 
         - name: Debug initial httpd_enable_homedirs status
           debug:
             var: initial_httpd_enable_homedirs.stdout
+          when: initial_httpd_enable_homedirs.rc == 0
 
         - name: Set httpd_enable_homedirs to on
           seboolean:
-            name: httpd_enable_homedirs
-            state: "yes" # 문자열 "yes" 또는 true 사용
+            name: httpd_enable_homedirs # 문자열로 이름 전달
+            state: "yes" # 문자열 "yes" 또는 true/on
             persistent: yes
           register: result_httpd_enable_homedirs
-          ignore_errors: no # <--- 실패 시 중단
+          ignore_errors: no # <--- 실패 원인 확인 위해 no
 
         - name: Debug httpd_enable_homedirs set result
           debug:
@@ -529,28 +531,32 @@
           command: getsebool httpd_enable_homedirs
           register: final_httpd_enable_homedirs
           changed_when: false
+          ignore_errors: yes
 
         - name: Debug FINAL httpd_enable_homedirs status
           debug:
             var: final_httpd_enable_homedirs.stdout
+          when: final_httpd_enable_homedirs.rc == 0
 
 
         - name: Get initial httpd_execmem status
           command: getsebool httpd_execmem
           register: initial_httpd_execmem
           changed_when: false
+          ignore_errors: yes
 
         - name: Debug initial httpd_execmem status
           debug:
             var: initial_httpd_execmem.stdout
+          when: initial_httpd_execmem.rc == 0
 
         - name: Set httpd_execmem to on
           seboolean:
-            name: httpd_execmem
+            name: httpd_execmem # 문자열로 이름 전달
             state: "yes"
             persistent: yes
           register: result_httpd_execmem
-          ignore_errors: no # <--- 실패 시 중단
+          ignore_errors: no # <--- 실패 원인 확인 위해 no
 
         - name: Debug httpd_execmem set result
           debug:
@@ -560,18 +566,19 @@
           command: getsebool httpd_execmem
           register: final_httpd_execmem
           changed_when: false
+          ignore_errors: yes
 
         - name: Debug FINAL httpd_execmem status
           debug:
             var: final_httpd_execmem.stdout
+          when: final_httpd_execmem.rc == 0
 
-        # httpd_can_network_connect는 필요에 따라 동일하게 추가
-        - name: Set httpd_can_network_connect to on
+        - name: Set httpd_can_network_connect to on # 필요시
           seboolean:
-            name: httpd_can_network_connect
+            name: httpd_can_network_connect # 문자열로 이름 전달
             state: "yes"
             persistent: yes
-          ignore_errors: no
+          ignore_errors: no # 필요시
 
         # --- SELinux File Contexts 정의 ---
         - name: Define SELinux context for project root (read-only content)
@@ -605,20 +612,20 @@
         - name: Apply SELinux context to project directories and venv
           command: "restorecon -Rv {{ item }}"
           loop:
-            - "{{ project_root_dir }}" # mediafiles 포함
-            - "{{ venv_dir }}"         # mod_wsgi.so 포함
+            - "{{ project_root_dir }}"
+            - "{{ venv_dir }}"
           register: restorecon_results
-          changed_when: "'Relabeled' in restorecon_results.stdout or restorecon_results.rc != 0" # 변경 또는 오류 시 changed
-          failed_when: restorecon_results.rc != 0 and 'No such file or directory' not in restorecon_results.stderr # 파일 없음 외의 오류는 실패
-          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
+          changed_when: "'Relabeled' in restorecon_results.stdout or restorecon_results.rc != 0"
+          failed_when: restorecon_results.rc != 0 and 'No such file or directory' not in restorecon_results.stderr
+          ignore_errors: no # <--- 실패 원인 확인 위해 no
 
         - name: Debug restorecon results
           debug:
             var: restorecon_results
-            verbosity: 1 # stdout/stderr도 보이도록
+            verbosity: 1
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # ignore_errors: yes # 블록 전체 ignore_errors는 최후에 고려
+      # ignore_errors: yes # 블록 전체 ignore_errors는 최후에
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
