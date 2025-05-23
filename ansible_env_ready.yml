@@ -286,11 +286,22 @@
           - "{{ sqlite_version_check_venv.stdout_lines[1] }}"
 
     # --- Apache mod_wsgi 설정 (root 권한) ---
+    - name: Get mod_wsgi module configuration using mod_wsgi-express
+      command: "{{ venv_dir }}/bin/mod_wsgi-express module-config"
+      register: mod_wsgi_config_output
+      changed_when: false
+      become: yes # mod_wsgi-express는 root 권한 필요 없을 수 있으나, venv_dir 접근 위해
+      become_user: "{{ target_project_user }}" # venv_dir 내의 mod_wsgi-express 실행
+
+    - name: Debug mod_wsgi_config_output
+      debug:
+        var: mod_wsgi_config_output.stdout_lines
+
     - name: Ensure mod_wsgi module is loaded and configured in Apache (RedHat family)
       blockinfile:
         path: "/etc/httpd/conf.modules.d/00-wsgi-custom.conf"
         block: |
-          LoadModule wsgi_module modules/mod_wsgi_python3.so
+          {{ mod_wsgi_config_output.stdout }}
           WSGISocketPrefix /var/run/wsgi
         create: yes
         owner: root
