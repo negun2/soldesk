@@ -1,28 +1,24 @@
-# vars/RedHat.yml
-target_user: "apache"
+# vars/RedHat.yml (예시)
+# target_user: "apache" # <--- 이 줄 제거 또는 주석 처리
+
 # --- Play 1: Setup Base System and Dependencies (Multi-OS) ---
-# "Install base packages (RedHat family)" 태스크에서 사용될 패키지 이름들
 python_dev_package_name: "python3-devel"
 apache_package_name: "httpd"
 apache_dev_package_name: "httpd-devel"
-mod_wsgi_package_name_system: "python3-mod_wsgi" # 또는 IUS/EPEL에서 찾은 python3용 mod_wsgi 정확한 이름
-                                                 # 예: 만약 시스템 기본 python3 (yum install python3)가 3.6.x이고,
-                                                 # EPEL에 python3-mod_wsgi 가 있다면 그것을 사용.
-                                                 # IUS 저장소를 추가하고 python36u를 사용한다면 python36u-mod_wsgi.
-python_virtualenv_package_name: "python3-virtualenv" # 또는 python3-pip으로 설치된 venv 사용
+mod_wsgi_package_name_system: "python3-mod_wsgi"
+python_virtualenv_package_name: "python3-virtualenv" # 또는 python3.6 이상은 내장 venv 사용 가능
 readline_dev_package_name: "readline-devel"
 zlib_dev_package_name: "zlib-devel"
 libffi_dev_package_name: "libffi-devel"
 libssl_dev_package_name: "openssl-devel"
-policycoreutils_package_name: "policycoreutils-python" # semanage, sefcontext 등 SELinux 유틸리티
+policycoreutils_package_name: "policycoreutils-python-utils" # semanage, sefcontext 등 SELinux 유틸리티
 
 # --- Play 2: Setup Django Web Environment (Multi-OS) ---
-# Django 환경 설정에 필요한 OS별 값들
 apache_user: "apache"
 apache_group: "apache"
-apache_conf_dir: "/etc/httpd/conf.d" # Apache 가상 호스트 설정 파일 디렉토리
-apache_sites_enabled_dir: "" # RedHat 계열에서는 sites-enabled 개념을 별도로 사용하지 않음 (필요시 빈 값)
-apache_service_name: "httpd" # Apache 서비스 이름
-mod_wsgi_load_file_content_django: "LoadModule wsgi_module modules/mod_wsgi_python3.so" # 실제 설치된 .so 파일명 확인 필요
+apache_conf_dir: "/etc/httpd/conf.d"
+apache_sites_enabled_dir: "" # RedHat 계열은 이 개념을 별도로 사용하지 않음
+apache_service_name: "httpd"
+# mod_wsgi_load_file_content_django: "" # RedHat에서는 conf.modules.d에 직접 추가하므로 불필요
 apache_log_dir: "/var/log/httpd"
 
