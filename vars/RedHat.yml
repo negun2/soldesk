@@ -1,4 +1,4 @@
-# vars/RedHat.yml (예시)
+# vars/RedHat.yml
 # target_user: "apache" # <--- 이 줄 제거 또는 주석 처리
 
 # --- Play 1: Setup Base System and Dependencies (Multi-OS) ---
