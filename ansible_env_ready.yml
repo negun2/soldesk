@@ -557,9 +557,9 @@
     # --- SELinux 설정 (RedHat 계열) ---
     - name: Configure SELinux for Apache serving from user home (RedHat family only)
       block:
-        - name: Ensure policycoreutils-python-utils is installed for semanage/sefcontext
+        - name: Ensure policycoreutils-python is installed for semanage/sefcontext
           yum:
-            name: "{{ policycoreutils_package_name | default('policycoreutils-python-utils') }}" # RedHat.yml에 정의된 것 사용
+            name: "{{ policycoreutils_package_name | default('policycoreutils-python') }}" # RedHat.yml에 정의된 것 사용
             state: present
           when: policycoreutils_package_name is defined and policycoreutils_package_name != ""
 
