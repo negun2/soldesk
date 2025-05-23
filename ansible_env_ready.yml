@@ -598,11 +598,11 @@
       # ignore_errors: yes # 블록 전체 ignore_errors는 최후에
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
-    - name: Clean up downloaded Apache template and directory
-      file:
-        path: "{{ downloaded_templates_dir }}"
-        state: absent
-      when: downloaded_templates_dir is defined and downloaded_templates_dir != "/" and downloaded_templates_dir != ansible_user_dir
+    #- name: Clean up downloaded Apache template and directory
+      #file:
+        #path: "{{ downloaded_templates_dir }}"
+        #state: absent
+      #when: downloaded_templates_dir is defined and downloaded_templates_dir != "/" and downloaded_templates_dir != ansible_user_dir
 
   handlers:
     - name: Restart Apache
