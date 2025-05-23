@@ -225,6 +225,17 @@
       become: yes
       # become_user: "{{ project_owner }}"
 
+    - name: Check SQLite version in venv before collectstatic
+      command: "{{ venv_dir }}/bin/python -c \"import sqlite3; print(sqlite3.sqlite_version)\""
+      register: sqlite_version_in_venv
+      changed_when: false
+      # become: no (플레이 기본값, project_owner 권한으로 실행)
+
+    - name: Debug SQLite version in venv
+      debug:
+        var: sqlite_version_in_venv.stdout
+      # become: no
+
     # --- Apache mod_wsgi 설정 ---
     # RedHat: /etc/httpd/conf.modules.d/10-wsgi-custom.conf
     # Debian: a2enmod wsgi_py3 (또는 wsgi)
