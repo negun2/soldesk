@@ -227,6 +227,12 @@
     server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
 
   tasks:
+    - name: Debug OS Family and SELinux Status
+      debug:
+        msg:
+          - "OS Family: {{ ansible_os_family }}"
+          - "SELinux Status: {{ ansible_selinux.status | default('Not defined') }}"
+          - "Is RedHat and SELinux enabled? {{ (ansible_os_family == 'RedHat' and ansible_selinux.status == 'enabled') | bool }}"
     # --- Apache 템플릿 다운로드 디렉터리 생성 ---
     - name: Create directory for downloaded Apache template
       file:
