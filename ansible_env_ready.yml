@@ -341,10 +341,16 @@
         var: mod_wsgi_config_output.stdout_lines
 
     - name: Ensure mod_wsgi module is loaded and configured in Apache (RedHat family)
+      vars:
+        # mod_wsgi-express 출력에서 LoadModule 경로의 lib64를 lib로 변경 시도
+        load_module_line: "{{ mod_wsgi_config_output.stdout_lines[0] | regex_replace('lib64', 'lib') }}"
+        # WSGIPythonHome은 venv 디렉토리 자체이므로 변경 불필요
+        wsgi_python_home_line: "{{ mod_wsgi_config_output.stdout_lines[1] }}"
       blockinfile:
         path: "/etc/httpd/conf.modules.d/00-wsgi-custom.conf"
         block: |
-          {{ mod_wsgi_config_output.stdout }}
+          {{ load_module_line }}
+          {{ wsgi_python_home_line }}
           WSGISocketPrefix /var/run/wsgi
         create: yes
         owner: root
