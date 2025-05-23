@@ -502,19 +502,41 @@
           yum:
             name: "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
             state: present
-          # when: 조건은 이미 block 레벨에 있음
 
-        # --- SELinux Booleans 설정 ---
+        # --- SELinux Booleans 설정 및 확인 ---
         - name: Set SELinux booleans for Apache
           seboolean:
-            name: "{{ item }}"
-            state: yes
+            name: "{{ item.name }}"
+            state: "{{ item.state }}"
             persistent: yes
           loop:
-            - httpd_enable_homedirs
-            - httpd_execmem
-            - httpd_can_network_connect
-          # ignore_errors: yes # <--- 디버깅 중에는 no 또는 register/failed_when 사용 고려
+            - { name: 'httpd_enable_homedirs', state: 'yes' }
+            - { name: 'httpd_execmem', state: 'yes' }
+            - { name: 'httpd_can_network_connect', state: 'yes' }
+          register: seboolean_results
+          # ignore_errors: yes # <--- 디버깅을 위해 일시적으로 주석 처리 또는 no로 변경
+
+        - name: Debug seboolean results
+          debug:
+            var: seboolean_results
+
+        - name: Verify httpd_enable_homedirs status
+          command: getsebool httpd_enable_homedirs
+          register: check_httpd_enable_homedirs
+          changed_when: false
+
+        - name: Debug httpd_enable_homedirs status
+          debug:
+            var: check_httpd_enable_homedirs.stdout
+
+        - name: Verify httpd_execmem status
+          command: getsebool httpd_execmem
+          register: check_httpd_execmem
+          changed_when: false
+
+        - name: Debug httpd_execmem status
+          debug:
+            var: check_httpd_execmem.stdout
 
         # --- SELinux File Contexts 정의 ---
         - name: Define SELinux context for project root (read-only content)
@@ -522,42 +544,44 @@
             target: "{{ project_root_dir }}(/.*)?"
             setype: httpd_sys_content_t
             state: present
-          # notify 제거, 아래에서 직접 restorecon
 
         - name: Define SELinux context for media directory (writable content)
           sefcontext:
             target: "{{ project_root_dir }}/mediafiles(/.*)?"
             setype: httpd_sys_rw_content_t
             state: present
-          # notify 제거
 
         - name: Define SELinux context for venv directory (readable content)
           sefcontext:
             target: "{{ venv_dir }}(/.*)?"
-            setype: httpd_sys_content_t # venv 자체는 실행 파일이 아니므로 content로
+            setype: httpd_sys_content_t # venv 내부 파일 읽기 허용
             state: present
-          # notify 제거
 
         - name: Define SELinux context for mod_wsgi.so (executable script/library)
           vars:
             mod_wsgi_so_file_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
           sefcontext:
-            target: "{{ mod_wsgi_so_file_path }}" # 정확한 파일 경로
-            setype: httpd_sys_script_exec_t
+            target: "{{ mod_wsgi_so_file_path }}" # 정확한 .so 파일 경로
+            setype: httpd_sys_script_exec_t # 실행 가능한 라이브러리
             state: present
-          # notify 제거
           when: mod_wsgi_config_output.stdout_lines is defined and mod_wsgi_config_output.stdout_lines | length > 0
+
         # --- SELinux 컨텍스트 즉시 적용 ---
         - name: Apply SELinux context to project directories and venv
           command: "restorecon -Rv {{ item }}"
           loop:
-            - "{{ project_root_dir }}" # mediafiles는 project_root_dir 하위이므로 함께 적용됨
-            - "{{ venv_dir }}"         # mod_wsgi.so는 venv_dir 하위이므로 함께 적용됨
-          changed_when: true # restorecon은 변경 시 출력이 있으므로 changed로 간주 가능
-          # ignore_errors: yes # <--- 디버깅 중에는 no 또는 register/failed_when 사용 고려
+            - "{{ project_root_dir }}" # mediafiles 포함
+            - "{{ venv_dir }}"         # mod_wsgi.so 포함
+          register: restorecon_results
+          changed_when: "'Relabeled' in restorecon_results.stdout" # 실제 변경이 있을 때만 changed
+          # ignore_errors: yes # 디버깅 중에는 no 또는 register/failed_when 사용 고려
+
+        - name: Debug restorecon results
+          debug:
+            var: restorecon_results
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # ignore_errors: yes # block 레벨의 ignore_errors는 최후에 고려
+      # ignore_errors: yes # 블록 전체에 대한 ignore_errors는 최후에
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
