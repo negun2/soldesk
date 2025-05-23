@@ -114,6 +114,17 @@
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
+    - name: Install acl package for using ACLs (RedHat family)
+      yum:
+        name: acl
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install acl package for using ACLs (Debian family)
+      apt:
+        name: acl
+        state: present
+      when: ansible_os_family == "Debian"
 
     # --- SQLite 소스 컴파일 및 설치 (시스템 레벨) ---
     - name: Create download and extraction directory for SQLite
@@ -386,18 +397,17 @@
         DJANGO_SETTINGS_MODULE: "{{ django_project_config_name }}.settings"
 
     # --- Apache 접근을 위한 권한 설정 (root 권한) ---
-    - name: Ensure Apache group can access project_owner's home directory path
-      file:
-        path: "{{ item }}"
-        mode: '0711' # u=rwx, g=x, o=x (Apache가 디렉토리 탐색 가능하도록)
-        state: directory
-      loop: "{{ project_base_dir.split('/') | select('!=','') | map('regex_replace', '^(.*)$', '/\\1') | items_before(project_base_dir) + [project_base_dir] }}"
-      # 위의 loop는 project_base_dir까지의 모든 상위 경로에 적용 (예: /home, /home/vagrant)
-      # 또는 간단하게:
-      # loop:
-      #  - "/home" # 만약 project_base_dir이 항상 /home 아래라면
-      #  - "{{ project_base_dir }}"
-      when: "project_base_dir.startswith('/home')" # /home 아래인 경우에만 가정
+    #- name: Ensure Apache group can access project_owner's home directory path
+      #file:
+        #path: "{{ item }}"
+        #mode: '0711' # u=rwx, g=x, o=x (Apache가 디렉토리 탐색 가능하도록)
+                     # 또는 'g+x'를 사용하여 그룹 실행 권한만 추가 (더 안전할 수 있음)
+        #state: directory
+      #loop: # <--- 수정된 부분
+        #- "/home"  # /home 디렉토리에 적용 (만약 project_base_dir이 항상 /home 아래라면)
+        #- "{{ project_base_dir }}" # 사용자 홈 디렉토리에 적용 (예: /home/vagrant)
+      #when: "project_base_dir.startswith('/home')" # /home 아래인 경우에만 실행 (다른 경로면 이 태스크 조정 필요)
+      #become: yes # 이 태스크는 root 권한으로 실행되어야 함
 
     - name: Set ACLs for Apache to access project directories
       acl:
