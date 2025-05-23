@@ -501,6 +501,22 @@
         state: started
         enabled: yes
 
+    - name: Ensure SELinux context for static files
+      sefcontext:
+        target: "{{ project_root_dir }}/staticfiles(/.*)?"
+        setype: httpd_sys_content_t
+        state: present
+
+    - name: Relabel static files directory
+      command: restorecon -Rv {{ project_root_dir }}/staticfiles/
+
+    - name: Validate WSGI configuration
+      command: apachectl configtest
+      register: apache_test
+      failed_when: apache_test.rc != 0
+    
+
+
 # --- SELinux 설정 ---
     - name: Configure SELinux for Apache serving from user home (RedHat family only)
       block:
