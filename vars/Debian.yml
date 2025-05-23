@@ -1,30 +1,23 @@
 # vars/Debian.yml
-target_user: "www-data"
+# target_user: "www-data" # <--- 이 줄 제거 또는 주석 처리
+
 # --- Play 1: Setup Base System and Dependencies (Multi-OS) ---
-# "Install base packages (Debian family)" 태스크에서 사용될 패키지 이름들
 python_dev_package_name: "python3-dev"
 apache_package_name: "apache2"
 apache_dev_package_name: "apache2-dev"
-mod_wsgi_package_name_system: "libapache2-mod-wsgi-py3" # 시스템 Apache용 mod_wsgi
+mod_wsgi_package_name_system: "libapache2-mod-wsgi-py3"
 python_virtualenv_package_name: "python3-venv"
 readline_dev_package_name: "libreadline-dev"
 zlib_dev_package_name: "zlib1g-dev"
 libffi_dev_package_name: "libffi-dev"
 libssl_dev_package_name: "libssl-dev"
 apparmor_utils_package_name: "apparmor-utils"
-# policycoreutils_package_name 변수는 Debian/Ubuntu에서는 SELinux 대신 AppArmor를 주로 사용하므로,
-# 해당 변수를 참조하는 부분을 플레이북에서 default(omit) 처리했거나, 여기에 빈 값을 넣거나,
-# 또는 AppArmor 관련 유틸리티 패키지명을 넣을 수 있습니다.
-# 만약 policycoreutils_package_name을 apt 태스크에서 default(omit) 없이 사용한다면 여기에 값을 정의해야 합니다.
-# 예: policycoreutils_package_name: "apparmor-utils" (AppArmor용, sefcontext와는 다름)
-# 또는 플레이북의 policycoreutils_package_name 참조를 RedHat 전용으로 제한
 
 # --- Play 2: Setup Django Web Environment (Multi-OS) ---
-# Django 환경 설정에 필요한 OS별 값들
 apache_user: "www-data"
 apache_group: "www-data"
 apache_conf_dir: "/etc/apache2/sites-available"
 apache_sites_enabled_dir: "/etc/apache2/sites-enabled"
 apache_service_name: "apache2"
-mod_wsgi_load_file_content_django: "" # Debian에서는 패키지가 보통 자동으로 처리
-apache_log_dir: "/var/log/apache2" # Ubuntu/Debian Apache 로그 디렉토리
+# mod_wsgi_load_file_content_django: "" # Debian에서는 a2enmod로 처리
+apache_log_dir: "/var/log/apache2"
