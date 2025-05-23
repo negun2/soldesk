@@ -504,86 +504,101 @@
             state: present
 
         # --- SELinux Booleans 설정 및 확인 ---
-        - name: Set SELinux booleans for Apache
-          seboolean:
-            name: "{{ item.name }}"
-            state: "{{ item.state }}"
-            persistent: yes
-          loop:
-            - { name: 'httpd_enable_homedirs', state: 'yes' }
-            - { name: 'httpd_execmem', state: 'yes' }
-            - { name: 'httpd_can_network_connect', state: 'yes' }
-          register: seboolean_results
-          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
-
-        - name: Debug seboolean results
-          debug:
-            var: seboolean_results
-
-        - name: Verify httpd_enable_homedirs status after set
+        - name: Get initial httpd_enable_homedirs status
           command: getsebool httpd_enable_homedirs
-          register: check_httpd_enable_homedirs
+          register: initial_httpd_enable_homedirs
           changed_when: false
 
-        - name: Debug httpd_enable_homedirs status
+        - name: Debug initial httpd_enable_homedirs status
           debug:
-            var: check_httpd_enable_homedirs.stdout
+            var: initial_httpd_enable_homedirs.stdout
 
-        - name: Verify httpd_execmem status after set
+        - name: Set httpd_enable_homedirs to on
+          seboolean:
+            name: httpd_enable_homedirs
+            state: "yes" # 문자열 "yes" 또는 true 사용
+            persistent: yes
+          register: result_httpd_enable_homedirs
+          ignore_errors: no # <--- 실패 시 중단
+
+        - name: Debug httpd_enable_homedirs set result
+          debug:
+            var: result_httpd_enable_homedirs
+
+        - name: Verify httpd_enable_homedirs status AFTER set
+          command: getsebool httpd_enable_homedirs
+          register: final_httpd_enable_homedirs
+          changed_when: false
+
+        - name: Debug FINAL httpd_enable_homedirs status
+          debug:
+            var: final_httpd_enable_homedirs.stdout
+
+
+        - name: Get initial httpd_execmem status
           command: getsebool httpd_execmem
-          register: check_httpd_execmem
+          register: initial_httpd_execmem
           changed_when: false
 
-        - name: Debug httpd_execmem status
+        - name: Debug initial httpd_execmem status
           debug:
-            var: check_httpd_execmem.stdout
+            var: initial_httpd_execmem.stdout
 
-        # --- SELinux File Contexts 정의 ---
+        - name: Set httpd_execmem to on
+          seboolean:
+            name: httpd_execmem
+            state: "yes"
+            persistent: yes
+          register: result_httpd_execmem
+          ignore_errors: no # <--- 실패 시 중단
+
+        - name: Debug httpd_execmem set result
+          debug:
+            var: result_httpd_execmem
+
+        - name: Verify httpd_execmem status AFTER set
+          command: getsebool httpd_execmem
+          register: final_httpd_execmem
+          changed_when: false
+
+        - name: Debug FINAL httpd_execmem status
+          debug:
+            var: final_httpd_execmem.stdout
+
+        # httpd_can_network_connect는 필요에 따라 동일하게 추가
+        - name: Set httpd_can_network_connect to on
+          seboolean:
+            name: httpd_can_network_connect
+            state: "yes"
+            persistent: yes
+          ignore_errors: no
+
+        # --- SELinux File Contexts 정의 (이전과 동일하게 유지) ---
         - name: Define SELinux context for project root (read-only content)
-          sefcontext:
-            target: "{{ project_root_dir }}(/.*)?"
-            setype: httpd_sys_content_t
-            state: present
-
+          sefcontext: # ...
         - name: Define SELinux context for media directory (writable content)
-          sefcontext:
-            target: "{{ project_root_dir }}/mediafiles(/.*)?"
-            setype: httpd_sys_rw_content_t
-            state: present
-
+          sefcontext: # ...
         - name: Define SELinux context for venv directory (readable content)
-          sefcontext:
-            target: "{{ venv_dir }}(/.*)?"
-            setype: httpd_sys_content_t
-            state: present
-
+          sefcontext: # ...
         - name: Define SELinux context for mod_wsgi.so (executable script/library)
-          vars:
-            mod_wsgi_so_file_path: "{{ (mod_wsgi_config_output.stdout_lines[0].split('\"')[1]) }}"
-          sefcontext:
-            target: "{{ mod_wsgi_so_file_path }}" # 정확한 .so 파일 경로
-            setype: httpd_sys_script_exec_t
-            state: present
-          when: mod_wsgi_config_output.stdout_lines is defined and mod_wsgi_config_output.stdout_lines | length > 0
+          vars: # ...
+          sefcontext: # ...
+          when: # ...
 
-        # --- SELinux 컨텍스트 즉시 적용 ---
+        # --- SELinux 컨텍스트 즉시 적용 (이전과 동일하게 유지) ---
         - name: Apply SELinux context to project directories and venv
-          command: "restorecon -Rv {{ item }}"
-          loop:
-            - "{{ project_root_dir }}" # mediafiles 포함
-            - "{{ venv_dir }}"         # mod_wsgi.so 포함
-          register: restorecon_results
-          changed_when: "'Relabeled' in restorecon_results.stdout or restorecon_results.rc != 0" # 변경 또는 오류 시 changed
-          failed_when: restorecon_results.rc != 0 and 'No such file or directory' not in restorecon_results.stderr # 파일 없음 외의 오류는 실패
-          ignore_errors: no # <--- 오류 발생 시 중단하여 확인
+          command: # ...
+          loop: # ...
+          register: # ...
+          changed_when: # ...
+          failed_when: # ...
+          ignore_errors: no
 
         - name: Debug restorecon results
-          debug:
-            var: restorecon_results
-            verbosity: 1 # stdout/stderr도 보이도록
+          debug: # ...
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # ignore_errors: yes # 블록 전체 ignore_errors는 최후에 고려
+      # ignore_errors: yes # 블록 전체 ignore_errors는 SELinux 문제 완전히 해결 후 고려
 
     # 두 번째 플레이 끝에 다운로드한 템플릿 디렉터리 정리
     - name: Clean up downloaded Apache template and directory
@@ -602,4 +617,4 @@
     - name: Restore wsgi socket dir SELinux context # 이것은 유지 (WSGI 소켓 디렉터리는 별도 경로)
       command: "restorecon -Rv /var/run/wsgi"
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      become: yesㄴ
+      become: yes
