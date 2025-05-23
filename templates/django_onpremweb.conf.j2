@@ -19,22 +19,22 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ 
 
     <Directory {{ project_root_dir }}/{{ django_project_config_name }}>
         <Files wsgi.py>
-            Require all granted  # <--- 이런 부분 확인
+            Require all granted
         </Files>
     </Directory>
 
     Alias /static/ {{ project_root_dir }}/staticfiles/
     <Directory {{ project_root_dir }}/staticfiles>
-        Require all granted  # <--- 이런 부분 확인
+        Require all granted
     </Directory>
 
     Alias /media/ {{ project_root_dir }}/mediafiles/
     <Directory {{ project_root_dir }}/mediafiles>
-        Require all granted  # <--- 이런 부분 확인, 여기가 36번째 줄 근처일 수 있습니다.
+        Require all granted
     </Directory>
 
     # 만약 project_base_dir 에 대한 Directory 블록이 있다면 (이전 제안에서 제거 권장)
     # <Directory {{ project_base_dir }}>
-    #    Require all granted # 이 부분도 확인
+    #    Require all granted
     # </Directory>
 </VirtualHost>
