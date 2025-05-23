@@ -1,18 +1,34 @@
-# templates/django_onpremweb.conf.j2
-
-# WSGIDaemonProcess는 project_owner가 아닌 apache_user로 실행되어야 함
-# python-home은 venv_dir, python-path는 project_root_dir
-WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ apache_group }} python-home={{ venv_dir }} python-path={{ project_root_dir }} threads=5 display-name=%{GROUP}
+WSGIDaemonProcess {{ apache_wsgi_daemon_name }} 
+  user={{ apache_user }} 
+  group={{ apache_group }} 
+  python-home={{ venv_dir }} 
+  python-path={{ project_root_dir }}:{{ project_root_dir }}/{{ django_project_config_name }}
+  processes=4 
+  threads=15 
+  maximum-requests=1000 
+  display-name=%{GROUP}
 
 <VirtualHost *:80>
     ServerName {{ server_name_ip }}
-    {% if server_alias_domain is defined and server_alias_domain %}
+    {% if server_alias_domain is defined %}
     ServerAlias {{ server_alias_domain }}
     {% endif %}
 
-    ErrorLog {{ apache_log_dir }}/{{ django_project_name }}-error.log
-    CustomLog {{ apache_log_dir }}/{{ django_project_name }}-access.log combined
+    # 정적 자원 처리 우선
+    Alias /static/ {{ project_root_dir }}/staticfiles/
+    <Directory {{ project_root_dir }}/staticfiles>
+        Require all granted
+        Header set Cache-Control "max-age=31536000, public"
+        FileETag All
+    </Directory>
 
+    Alias /media/ {{ project_root_dir }}/mediafiles/
+    <Directory {{ project_root_dir }}/mediafiles>
+        Require all granted
+        Header set Cache-Control "max-age=604800, public"
+    </Directory>
+
+    # WSGI 구성
     WSGIScriptAlias / {{ project_root_dir }}/{{ django_project_config_name }}/wsgi.py
     WSGIProcessGroup {{ apache_wsgi_daemon_name }}
     WSGIApplicationGroup %{GLOBAL}
@@ -23,18 +39,19 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }} user={{ apache_user }} group={{ 
         </Files>
     </Directory>
 
-    Alias /static/ {{ project_root_dir }}/staticfiles/
-    <Directory {{ project_root_dir }}/staticfiles>
-        Require all granted
+    # 상위 디렉토리 접근 제한
+    <Directory {{ project_root_dir }}>
+        Options -Indexes
+        AllowOverride None
+        Require all denied
     </Directory>
 
-    Alias /media/ {{ project_root_dir }}/mediafiles/
-    <Directory {{ project_root_dir }}/mediafiles>
-        Require all granted
-    </Directory>
+    # 로그 관리
+    ErrorLog "|/usr/sbin/rotatelogs -l {{ apache_log_dir }}/%Y%m%d-{{ django_project_name }}-error.log 86400"
+    CustomLog "|/usr/sbin/rotatelogs -l {{ apache_log_dir }}/%Y%m%d-{{ django_project_name }}-access.log 86400" combined
 
-    # 만약 project_base_dir 에 대한 Directory 블록이 있다면 (이전 제안에서 제거 권장)
-    # <Directory {{ project_base_dir }}>
-    #    Require all granted
-    # </Directory>
+    # 연결 관리
+    KeepAlive On
+    KeepAliveTimeout 5
+    MaxKeepAliveRequests 100
 </VirtualHost>
