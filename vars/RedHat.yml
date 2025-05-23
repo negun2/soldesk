@@ -6,7 +6,7 @@ python_dev_package_name: "python3-devel"
 apache_package_name: "httpd"
 apache_dev_package_name: "httpd-devel"
 #mod_wsgi_package_name_system: "python3-mod_wsgi"
-python_virtualenv_package_name: "python3-virtualenv" # 또는 python3.6 이상은 내장 venv 사용 가능
+#python_virtualenv_package_name: "python3-virtualenv" # 또는 python3.6 이상은 내장 venv 사용 가능
 readline_dev_package_name: "readline-devel"
 zlib_dev_package_name: "zlib-devel"
 libffi_dev_package_name: "libffi-devel"
