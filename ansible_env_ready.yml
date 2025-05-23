@@ -453,13 +453,13 @@
     - name: Set ACLs for Apache to access project directories
       acl:
         path: "{{ item.path }}"
-        entity: "{{ apache_group }}" # OS별 Apache 그룹 (from vars)
+        entity: "{{ apache_group }}"
         etype: group
         permissions: "{{ item.permissions }}"
         state: present
         recursive: "{{ item.recursive | default(false) }}"
       loop:
-        - { path: "{{ project_base_dir }}", permissions: "x", recursive: false }
+        - { path: "{{ project_base_dir }}", permissions: "rX", recursive: false } # <--- 'x'에서 'rX'로 변경
         - { path: "{{ project_root_dir }}", permissions: "rX", recursive: true }
         - { path: "{{ venv_dir }}", permissions: "rX", recursive: true }
       when: ansible_os_family != "Darwin"
