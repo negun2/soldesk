@@ -88,7 +88,7 @@
         password: "{{ postgres_password }}"
         db: "{{ postgres_db }}"
         role_attr_flags: "LOGIN CREATEDB"
-        state: present"
+        state: present
 
     - name: Create PostgreSQL DB
       become_user: postgres
