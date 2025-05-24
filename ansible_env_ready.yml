@@ -473,10 +473,6 @@
         mode: '0644'
       notify: Restart Apache
 
-    - name: Disable default Apache site (Debian family only) # ... (이전과 동일)
-    - name: Enable Apache site for Django (Debian family only) # ... (이전과 동일)
-    - name: Ensure Apache service is enabled and running # ... (이전과 동일)
-
     # --- SELinux 설정 (Boolean 테스트 집중) ---
     - name: Configure SELinux Booleans for Apache (RedHat family only)
       block:
