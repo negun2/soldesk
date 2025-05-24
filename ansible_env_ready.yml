@@ -79,12 +79,16 @@
         enabled: yes
 
     - name: Set PostgreSQL password for user
+      become: yes
       become_user: postgres
+      environment:
+        ANSIBLE_REMOTE_TEMP: /tmp/ansible
       postgresql_user:
         name: "{{ postgres_user }}"
         password: "{{ postgres_password }}"
         db: "{{ postgres_db }}"
-        priv: "ALL"
+        role_attr_flags: "LOGIN CREATEDB"
+        state: present"
 
     - name: Create PostgreSQL DB
       become_user: postgres
