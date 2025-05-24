@@ -193,19 +193,47 @@
         state: started
         enabled: yes
 
-    - name: Create PostgreSQL database and user
+    - name: Create PostgreSQL database
+      become: yes
       become_user: postgres
-      postgresql_db:
+      community.postgresql.postgresql_db:
         name: "{{ postgres_db }}"
-      register: createdb
 
     - name: Create PostgreSQL user
+      become: yes
       become_user: postgres
-      postgresql_user:
+      community.postgresql.postgresql_user:
         name: "{{ postgres_user }}"
         password: "{{ postgres_password }}"
         db: "{{ postgres_db }}"
         priv: "ALL"
+
+    - name: Configure Django to use PostgreSQL
+      blockinfile:
+        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
+        marker: "# {mark} ANSIBLE MANAGED DATABASE CONFIG"
+        block: |
+          DATABASES = {
+              'default': {
+                  'ENGINE': 'django.db.backends.postgresql_psycopg2',
+                  'NAME': '{{ postgres_db }}',
+                  'USER': '{{ postgres_user }}',
+                  'PASSWORD': '{{ postgres_password }}',
+                  'HOST': 'localhost',
+                  'PORT': '5432',
+              }
+          }
+
+    - name: Run Django migrations
+      command: "{{ venv_dir }}/bin/python manage.py migrate"
+      args:
+        chdir: "{{ project_root_dir }}"
+
+    - name: Create Django superuser
+      shell: |
+        echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | {{ venv_dir }}/bin/python manage.py shell
+      args:
+        chdir: "{{ project_root_dir }}"
 
     - name: Create project structure and virtualenv
       block:
