@@ -46,17 +46,17 @@
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name }}"
-          - "{{ apache_package_name }}"
-          - "{{ apache_dev_package_name }}"
-          - "{{ mod_wsgi_package_name_system }}"
-          - "{{ python_virtualenv_package_name }}"
+          - "{{ python_dev_package_name | default('python3-devel') }}"
+          - "{{ apache_package_name | default('httpd') }}"
+          - "{{ apache_dev_package_name | default('httpd-devel') }}"
+          - "{{ mod_wsgi_package_name_system | default('mod_wsgi') }}"
+          - "{{ python_virtualenv_package_name | default('python3-virtualenv') }}"
           - wget
-          - "{{ readline_dev_package_name }}"
-          - "{{ zlib_dev_package_name }}"
-          - "{{ libffi_dev_package_name }}"
-          - "{{ libssl_dev_package_name }}"
-          - "{{ policycoreutils_package_name }}"
+          - "{{ readline_dev_package_name | default('readline-devel') }}"
+          - "{{ zlib_dev_package_name | default('zlib-devel') }}"
+          - "{{ libffi_dev_package_name | default('libffi-devel') }}"
+          - "{{ libssl_dev_package_name | default('openssl-devel') }}"
+          - "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
         state: present
       when: ansible_os_family == "RedHat"
 
@@ -66,17 +66,17 @@
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name }}"
-          - "{{ apache_package_name }}"
-          - "{{ apache_dev_package_name }}"
-          - "{{ mod_wsgi_package_name_system }}"
-          - "{{ python_virtualenv_package_name }}"
+          - "{{ python_dev_package_name | default('python3-dev') }}"
+          - "{{ apache_package_name | default('apache2') }}"
+          - "{{ apache_dev_package_name | default('apache2-dev') }}"
+          - "{{ mod_wsgi_package_name_system | default('libapache2-mod-wsgi-py3') }}"
+          - "{{ python_virtualenv_package_name | default('python3-venv') }}"
           - wget
-          - "{{ readline_dev_package_name }}"
-          - "{{ zlib_dev_package_name }}"
-          - "{{ libffi_dev_package_name }}"
-          - "{{ libssl_dev_package_name }}"
-          - "{{ apparmor_utils_package_name }}"
+          - "{{ readline_dev_package_name | default('libreadline-dev') }}"
+          - "{{ zlib_dev_package_name | default('zlib1g-dev') }}"
+          - "{{ libffi_dev_package_name | default('libffi-dev') }}"
+          - "{{ libssl_dev_package_name | default('libssl-dev') }}"
+          - "{{ apparmor_utils_package_name | default('apparmor-utils') }}"
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
@@ -168,9 +168,15 @@
     - name: Include OS-specific vars
       include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
 
-    - name: Create required directories and virtualenv
+    - name: Create project structure and virtualenv
       block:
-        - name: Ensure project directory
+        - name: Ensure parent directory exists
+          file:
+            path: "{{ target_user_home }}"
+            state: directory
+            mode: '0755'
+
+        - name: Create project root directory
           file:
             path: "{{ project_root_dir }}"
             state: directory
@@ -190,7 +196,7 @@
             group: "{{ target_user }}"
             recurse: yes
 
-    - name: Install Python dependencies in virtualenv
+    - name: Install Python dependencies
       pip:
         name:
           - wheel
@@ -198,13 +204,30 @@
           - mod_wsgi
         virtualenv: "{{ venv_dir }}"
 
+    - name: Create Django project
+      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ."
+      args:
+        chdir: "{{ project_root_dir }}"
+        creates: "{{ project_root_dir }}/manage.py"
+
+    - name: Create static/media directories
+      loop:
+        - staticfiles
+        - mediafiles
+      file:
+        path: "{{ project_root_dir }}/{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0755'
+
     - name: Download Apache config template
       get_url:
         url: "{{ apache_conf_template_download_url }}"
         dest: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
-    - name: Deploy Apache virtual host config
+    - name: Deploy Apache config
       template:
         src: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         remote_src: yes
@@ -213,6 +236,11 @@
         group: root
         mode: '0644'
       notify: Restart Apache
+
+    - name: Collect static files
+      command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
+      args:
+        chdir: "{{ project_root_dir }}"
 
     - name: Start and enable Apache
       service:
