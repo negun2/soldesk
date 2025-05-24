@@ -11,7 +11,7 @@
     sqlite_install_prefix: "/usr/local"
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
     downloaded_vars_dir: "/tmp/downloaded_os_vars"
-    mod_wsgi_package_name_system: "mod_wsgi"  # fallback 기본값 지정
+    mod_wsgi_package_name_system: "mod_wsgi"
 
   tasks:
     - name: Create directory for downloaded OS vars files
@@ -142,54 +142,6 @@
             path: "{{ sqlite_download_dest_dir }}"
             state: absent
 
-    - name: Ensure SELinux rules for Apache and project
-      block:
-        - name: Allow httpd to access project files
-          sefcontext:
-            target: "{{ project_root_dir }}(/.*)?"
-            setype: httpd_sys_content_t
-            state: present
-
-        - name: Allow httpd to write to media directory
-          sefcontext:
-            target: "{{ project_root_dir }}/mediafiles(/.*)?"
-            setype: httpd_sys_rw_content_t
-            state: present
-
-        - name: Allow httpd network connections
-          seboolean:
-            name: httpd_can_network_connect
-            state: yes
-            persistent: yes
-
-        - name: Allow httpd database connections
-          seboolean:
-            name: httpd_can_network_connect_db
-            state: yes
-            persistent: yes
-
-      when: ansible_os_family == "RedHat"
-
-    - name: Ensure firewalld is enabled and allows HTTP
-      block:
-        - name: Ensure firewalld is installed and running
-          service:
-            name: firewalld
-            state: started
-            enabled: yes
-
-        - name: Open HTTP and HTTPS ports
-          firewalld:
-            port: "{{ item }}"
-            permanent: true
-            state: enabled
-            immediate: yes
-          loop:
-            - 80/tcp
-            - 443/tcp
-
-      when: ansible_os_family == "RedHat"
-
   handlers:
     - name: Run ldconfig
       command: ldconfig
@@ -212,10 +164,48 @@
     venv_dir: "{{ project_root_dir }}/venv"
     apache_wsgi_daemon_name: "onpremweb_daemon"
     server_name_ip: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    postgres_user: "django"
+    postgres_password: "changeme123"
+    postgres_db: "onpremwebdb"
 
   tasks:
     - name: Include OS-specific vars
       include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
+
+    - name: Install PostgreSQL server and client
+      package:
+        name:
+          - postgresql
+          - postgresql-server
+          - postgresql-contrib
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Initialize PostgreSQL database (RedHat)
+      command: /usr/bin/postgresql-setup initdb
+      args:
+        creates: /var/lib/pgsql/data/PG_VERSION
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure PostgreSQL service is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Create PostgreSQL database and user
+      become_user: postgres
+      postgresql_db:
+        name: "{{ postgres_db }}"
+      register: createdb
+
+    - name: Create PostgreSQL user
+      become_user: postgres
+      postgresql_user:
+        name: "{{ postgres_user }}"
+        password: "{{ postgres_password }}"
+        db: "{{ postgres_db }}"
+        priv: "ALL"
 
     - name: Create project structure and virtualenv
       block:
@@ -250,6 +240,7 @@
         name:
           - wheel
           - "django=={{ django_version }}"
+          - psycopg2-binary
           - mod_wsgi
         virtualenv: "{{ venv_dir }}"
 
@@ -290,6 +281,52 @@
       command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
       args:
         chdir: "{{ project_root_dir }}"
+
+    - name: Ensure SELinux rules for Apache and project
+      block:
+        - name: Allow httpd to access project files
+          sefcontext:
+            target: "{{ project_root_dir }}(/.*)?"
+            setype: httpd_sys_content_t
+            state: present
+
+        - name: Allow httpd to write to media directory
+          sefcontext:
+            target: "{{ project_root_dir }}/mediafiles(/.*)?"
+            setype: httpd_sys_rw_content_t
+            state: present
+
+        - name: Allow httpd network connections
+          seboolean:
+            name: httpd_can_network_connect
+            state: yes
+            persistent: yes
+
+        - name: Allow httpd database connections
+          seboolean:
+            name: httpd_can_network_connect_db
+            state: yes
+            persistent: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure firewalld is enabled and allows HTTP
+      block:
+        - name: Ensure firewalld is installed and running
+          service:
+            name: firewalld
+            state: started
+            enabled: yes
+
+        - name: Open HTTP and HTTPS ports
+          firewalld:
+            port: "{{ item }}"
+            permanent: true
+            state: enabled
+            immediate: yes
+          loop:
+            - 80/tcp
+            - 443/tcp
+      when: ansible_os_family == "RedHat"
 
     - name: Start and enable Apache
       service:
