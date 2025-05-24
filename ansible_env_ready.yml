@@ -1,4 +1,3 @@
-# ansible_env_ready.yml
 ---
 - name: Setup Base System and Dependencies (Multi-OS)
   hosts: localhost
@@ -6,466 +5,208 @@
   become: yes
 
   vars:
-    # 공통 변수
     sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
     sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
     sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
     sqlite_install_prefix: "/usr/local"
-
-    # OS별 변수 파일 다운로드 설정
-    github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
-    ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
-    downloaded_os_vars_dir: "/tmp/downloaded_os_vars_pb_{{ ansible_date_time.epoch }}"
+    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
+    downloaded_vars_dir: "/tmp/downloaded_os_vars"
 
   tasks:
-    # --- OS별 변수 파일 다운로드 디렉터리 생성 ---
-    - name: Create directory for downloaded OS vars files in /tmp
+    - name: Create directory for downloaded OS vars files
       file:
-        path: "{{ downloaded_os_vars_dir }}"
+        path: "{{ downloaded_vars_dir }}"
         state: directory
         mode: '0755'
 
-    # --- OS별 변수 파일 다운로드 ---
     - name: Download OS-specific var files from GitHub
       get_url:
-        url: "{{ github_base_url }}/vars/{{ item }}"
-        dest: "{{ downloaded_os_vars_dir }}/{{ item }}"
+        url: "{{ os_vars_base_url }}/{{ item }}"
+        dest: "{{ downloaded_vars_dir }}/{{ item }}"
         mode: '0644'
       loop:
         - "RedHat.yml"
         - "Debian.yml"
       ignore_errors: yes
 
-    # --- 변수 로드 ---
-    - name: Read RedHat vars file content
-      slurp:
-        src: "{{ downloaded_os_vars_dir }}/RedHat.yml"
-      register: redhat_vars_file_b64
-      when: ansible_os_family == "RedHat"
-      ignore_errors: yes
+    - name: Include OS-specific vars
+      include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
 
-    - name: Set facts from RedHat vars file
-      set_fact:
-        "{{ item.key }}": "{{ item.value }}"
-      loop: "{{ (redhat_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
-      when: ansible_os_family == "RedHat" and redhat_vars_file_b64.content is defined and redhat_vars_file_b64.content != ""
-      no_log: true
-
-    - name: Read Debian vars file content
-      slurp:
-        src: "{{ downloaded_os_vars_dir }}/Debian.yml"
-      register: debian_vars_file_b64
-      when: ansible_os_family == "Debian"
-      ignore_errors: yes
-
-    - name: Set facts from Debian vars file
-      set_fact:
-        "{{ item.key }}": "{{ item.value }}"
-      loop: "{{ (debian_vars_file_b64.content | b64decode | from_yaml | default({})) | dict2items }}"
-      when: ansible_os_family == "Debian" and debian_vars_file_b64.content is defined and debian_vars_file_b64.content != ""
-      no_log: true
-
-    # --- 기본 패키지 설치 ---
     - name: Install IUS Community repository (RedHat family only)
       yum:
-        name: "{{ ius_release_rpm_url }}"
+        name: "https://repo.ius.io/ius-release-el7.rpm"
         state: present
         disable_gpg_check: yes
       when: ansible_os_family == "RedHat"
 
-    - name: Install base packages (RedHat family)
+    - name: Install base packages (RedHat)
       yum:
         name:
           - epel-release
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name | default(omit) }}"
-          - "{{ apache_package_name | default(omit) }}"
-          - "{{ apache_dev_package_name | default(omit) }}"
+          - "{{ python_dev_package_name }}"
+          - "{{ apache_package_name }}"
+          - "{{ apache_dev_package_name }}"
+          - "{{ mod_wsgi_package_name_system }}"
+          - "{{ python_virtualenv_package_name }}"
           - wget
-          - "{{ readline_dev_package_name | default(omit) }}"
-          - "{{ zlib_dev_package_name | default(omit) }}"
-          - "{{ libffi_dev_package_name | default(omit) }}"
-          - "{{ libssl_dev_package_name | default(omit) }}"
-          - "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
+          - "{{ readline_dev_package_name }}"
+          - "{{ zlib_dev_package_name }}"
+          - "{{ libffi_dev_package_name }}"
+          - "{{ libssl_dev_package_name }}"
+          - "{{ policycoreutils_package_name }}"
         state: present
       when: ansible_os_family == "RedHat"
 
-    - name: Install base packages (Debian family)
+    - name: Install base packages (Debian)
       apt:
         name:
           - python3
           - python3-pip
           - gcc
-          - "{{ python_dev_package_name | default(omit) }}"
-          - "{{ apache_package_name | default(omit) }}"
-          - "{{ apache_dev_package_name | default(omit) }}"
+          - "{{ python_dev_package_name }}"
+          - "{{ apache_package_name }}"
+          - "{{ apache_dev_package_name }}"
+          - "{{ mod_wsgi_package_name_system }}"
+          - "{{ python_virtualenv_package_name }}"
           - wget
-          - "{{ readline_dev_package_name | default(omit) }}"
-          - "{{ zlib_dev_package_name | default(omit) }}"
-          - "{{ libffi_dev_package_name | default(omit) }}"
-          - "{{ libssl_dev_package_name | default(omit) }}"
-          - "{{ apparmor_utils_package_name | default(omit) }}"
+          - "{{ readline_dev_package_name }}"
+          - "{{ zlib_dev_package_name }}"
+          - "{{ libffi_dev_package_name }}"
+          - "{{ libssl_dev_package_name }}"
+          - "{{ apparmor_utils_package_name }}"
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Install acl package for using ACLs (RedHat family)
-      yum:
-        name: acl
-        state: present
-      when: ansible_os_family == "RedHat"
+    - name: Install development tools
+      block:
+        - name: Install 'Development Tools' group (RedHat)
+          yum:
+            name: "@Development Tools"
+            state: present
+          when: ansible_os_family == "RedHat"
 
-    - name: Install acl package for using ACLs (Debian family)
-      apt:
-        name: acl
-        state: present
-      when: ansible_os_family == "Debian"
+        - name: Install 'build-essential' (Debian)
+          apt:
+            name: build-essential
+            state: present
+          when: ansible_os_family == "Debian"
 
-    # --- SQLite 소스 컴파일 및 설치 (시스템 레벨) ---
-    - name: Create download and extraction directory for SQLite
-      file:
-        path: "{{ sqlite_download_dest_dir }}"
-        state: directory
-        mode: '0755'
+    - name: Download and compile SQLite
+      block:
+        - name: Create download directory
+          file:
+            path: "{{ sqlite_download_dest_dir }}"
+            state: directory
+            mode: '0755'
 
-    - name: Download SQLite source from GitHub
-      get_url:
-        url: "{{ sqlite_download_url }}"
-        dest: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
-        mode: '0644'
-      register: sqlite_download_status
-      until: sqlite_download_status is succeeded
-      retries: 3
-      delay: 5
+        - name: Download SQLite source
+          get_url:
+            url: "{{ sqlite_download_url }}"
+            dest: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
+            mode: '0644'
+          register: sqlite_download_status
+          until: sqlite_download_status is succeeded
+          retries: 3
+          delay: 5
 
-    - name: Unarchive SQLite source
-      unarchive:
-        src: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
-        dest: "{{ sqlite_download_dest_dir }}"
-        remote_src: yes
-      register: sqlite_unarchive_result
+        - name: Unarchive SQLite
+          unarchive:
+            src: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
+            dest: "{{ sqlite_download_dest_dir }}"
+            remote_src: yes
+          register: sqlite_unarchive_result
 
-    - name: Configure SQLite
-      command: "./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5"
-      args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
-      changed_when: false
+        - name: Configure, build, and install SQLite
+          command: "{{ item }}"
+          args:
+            chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
+          loop:
+            - "./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5"
+            - "make -j{{ ansible_processor_vcpus | default(1) }}"
+            - "make install"
 
-    - name: Compile SQLite
-      command: "make -j{{ ansible_processor_vcpus | default(1) }}"
-      args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
-      changed_when: false
+        - name: Configure dynamic linker for SQLite
+          copy:
+            content: "{{ sqlite_install_prefix }}/lib"
+            dest: /etc/ld.so.conf.d/sqlite3-custom.conf
+            mode: '0644'
+          notify: Run ldconfig
 
-    - name: Install SQLite
-      command: "make install"
-      args:
-        chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
-
-    - name: Configure dynamic linker run-time bindings for SQLite
-      copy:
-        content: "{{ sqlite_install_prefix }}/lib"
-        dest: /etc/ld.so.conf.d/sqlite3-custom.conf
-        mode: '0644'
-      notify: Run ldconfig
-
-    - name: Clean up SQLite download and extraction directory
-      file:
-        path: "{{ sqlite_download_dest_dir }}"
-        state: absent
-
-    # 첫 번째 플레이 끝에 다운로드한 OS vars 디렉터리 정리
-    - name: Clean up downloaded OS vars directory created by this play
-      file:
-        path: "{{ downloaded_os_vars_dir }}"
-        state: absent
-      when: downloaded_os_vars_dir is defined and downloaded_os_vars_dir != "/" and downloaded_os_vars_dir != (ansible_user_dir | default('')) # ansible_user_dir 없을 경우 대비
+        - name: Clean up SQLite source
+          file:
+            path: "{{ sqlite_download_dest_dir }}"
+            state: absent
 
   handlers:
     - name: Run ldconfig
       command: ldconfig
-      become: yes
 
-# --- 두 번째 플레이: Setup Django Web Environment (Multi-OS) ---
 - name: Setup Django Web Environment (Multi-OS)
   hosts: localhost
-  become: yes # 플레이 기본 권한 상승
+  become: yes
   gather_facts: yes
 
   vars:
-    target_project_user: "vagrant"
-    target_project_user_home: "/home/{{ target_project_user }}"
-    python_executable: "python3"
-
     django_project_name: "onpremweb"
-    django_project_app_dirname: "{{ django_project_name }}_app"
-    project_base_dir: "{{ target_project_user_home }}"
-    project_root_dir: "{{ project_base_dir }}/{{ django_project_app_dirname }}"
-    venv_dir: "{{ project_root_dir }}/venv"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
-    apache_wsgi_daemon_name: "{{ django_project_name }}_daemon"
-
-    github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
-    # ansible_user_dir 대신 target_project_user_home 사용 또는 /tmp
-    downloaded_templates_dir: "{{ target_project_user_home }}/downloaded_apache_templates_pb_{{ ansible_date_time.epoch }}"
-    apache_conf_template_filename: "django_onpremweb.conf.j2"
-    downloaded_apache_conf_path: "{{ downloaded_templates_dir }}/{{ apache_conf_template_filename }}"
-
-    server_name_ip: "{{ ansible_default_ipv4.address if ansible_default_ipv4.address is defined else '127.0.0.1' }}"
+    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
+    downloaded_vars_dir: "/tmp/downloaded_os_vars"
+    apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
+    apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
+    target_user_home: "/var/www"
+    project_root_dir: "{{ target_user_home }}/{{ django_project_name }}"
+    venv_dir: "{{ project_root_dir }}/venv"
+    apache_wsgi_daemon_name: "onpremweb_daemon"
+    server_name_ip: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
 
   tasks:
-    - name: Debug OS Family and SELinux Status before SELinux block
-      debug:
-        msg:
-          - "OS Family: {{ ansible_os_family }}"
-          - "SELinux Status: {{ ansible_selinux.status | default('Not defined') }}"
-          - "Is RedHat and SELinux enabled? {{ (ansible_os_family == 'RedHat' and ansible_selinux.status == 'enabled') | bool }}"
+    - name: Include OS-specific vars
+      include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
 
-    - name: Create directory for downloaded Apache template
-      file:
-        path: "{{ downloaded_templates_dir }}"
-        state: directory
-        mode: '0755'
-        owner: "{{ target_project_user }}"
-        group: "{{ target_project_user }}"
-      become: yes
+    - name: Create required directories and virtualenv
+      block:
+        - name: Ensure project directory
+          file:
+            path: "{{ project_root_dir }}"
+            state: directory
+            owner: "{{ target_user }}"
+            group: "{{ target_user }}"
+            mode: '0755'
 
-    - name: Download Apache config template from GitHub
-      get_url:
-        url: "{{ github_base_url }}/templates/{{ apache_conf_template_filename }}"
-        dest: "{{ downloaded_apache_conf_path }}"
-        mode: '0644'
-      become: yes # root로 다운로드하여 target_project_user 소유 디렉터리에 저장 (위 file 태스크 owner/group이 우선)
-                  # 또는 become_user: "{{ target_project_user }}" 로 실행
+        - name: Create Python virtual environment
+          command: "python3 -m venv {{ venv_dir }}"
+          args:
+            creates: "{{ venv_dir }}/bin/activate"
 
-    - name: Debug initial user and path variables
-      debug:
-        msg:
-          - "ansible_user_id: {{ ansible_user_id }}"
-          - "ansible_user_dir: {{ ansible_user_dir }}"
-          - "target_project_user: {{ target_project_user }}"
-          - "target_project_user_home: {{ target_project_user_home }}"
-          - "project_base_dir: {{ project_base_dir }}"
-          - "project_root_dir: {{ project_root_dir }}"
-          - "venv_dir: {{ venv_dir }}"
-          - "downloaded_apache_conf_path: {{ downloaded_apache_conf_path }}"
+        - name: Change ownership of venv
+          file:
+            path: "{{ venv_dir }}"
+            owner: "{{ target_user }}"
+            group: "{{ target_user }}"
+            recurse: yes
 
-    - name: Ensure project base directory (user's home) exists
-      file:
-        path: "{{ project_base_dir }}"
-        state: directory
-        owner: "{{ target_project_user }}"
-        group: "{{ target_project_user }}"
-        mode: '0755'
-
-    - name: Ensure project root directory exists
-      file:
-        path: "{{ project_root_dir }}"
-        state: directory
-        owner: "{{ target_project_user }}"
-        group: "{{ target_project_user }}"
-        mode: '0755'
-
-    - name: Create Python virtual environment with system python3
-      command: "{{ python_executable }} -m venv {{ venv_dir }}"
-      args:
-        creates: "{{ venv_dir }}/bin/activate"
-      become: yes
-      become_user: "{{ target_project_user }}"
-
-    - name: Install wheel in virtual environment
-      pip:
-        name: wheel
-        virtualenv: "{{ venv_dir }}"
-      become: yes
-      become_user: "{{ target_project_user }}"
-
-    - name: Install Django, mod_wsgi, and pysqlite3-binary
+    - name: Install Python dependencies in virtualenv
       pip:
         name:
+          - wheel
           - "django=={{ django_version }}"
           - mod_wsgi
-          - pysqlite3-binary
         virtualenv: "{{ venv_dir }}"
-      become: yes
-      become_user: "{{ target_project_user }}"
 
-    - name: Check SQLite version in venv
-      command: >
-        {{ venv_dir }}/bin/python -c
-        "import sqlite3;
-        print('Python sqlite3 module version: %s' % sqlite3.sqlite_version);
-        conn = sqlite3.connect(':memory:');
-        cursor = conn.cursor();
-        cursor.execute('select sqlite_version()');
-        db_version = cursor.fetchone()[0];
-        print('Actual SQLite DB engine version in use: %s' % db_version);
-        conn.close()"
-      register: sqlite_version_check_venv
-      changed_when: false
-      become: yes
-      become_user: "{{ target_project_user }}"
-
-    - name: Debug SQLite version in venv
-      debug:
-        msg:
-          - "{{ sqlite_version_check_venv.stdout_lines[0] }}"
-          - "{{ sqlite_version_check_venv.stdout_lines[1] }}"
-
-    - name: Get mod_wsgi module configuration using mod_wsgi-express
-      command: "{{ venv_dir }}/bin/mod_wsgi-express module-config"
-      register: mod_wsgi_config_output
-      changed_when: false
-      become: yes
-      become_user: "{{ target_project_user }}"
-
-    - name: Debug mod_wsgi_config_output
-      debug:
-        var: mod_wsgi_config_output.stdout_lines
-
-    - name: Ensure mod_wsgi module is loaded and configured in Apache (RedHat family)
-      vars:
-        load_module_line: "{{ mod_wsgi_config_output.stdout_lines[0] | regex_replace('lib64', 'lib') }}"
-        wsgi_python_home_line: "{{ mod_wsgi_config_output.stdout_lines[1] }}"
-      blockinfile:
-        path: "/etc/httpd/conf.modules.d/00-wsgi-custom.conf"
-        block: |
-          {{ load_module_line }}
-          {{ wsgi_python_home_line }}
-          WSGISocketPrefix /var/run/wsgi
-        create: yes
-        owner: root
-        group: root
-        mode: '0644'
-      when: ansible_os_family == "RedHat"
-      notify: Restart Apache
-
-    - name: Create WSGI socket directory (RedHat family)
-      file:
-        path: /var/run/wsgi
-        state: directory
-        owner: "{{ apache_user }}"
-        group: "{{ apache_group }}"
-        mode: '0755'
-      when: ansible_os_family == "RedHat"
-
-    - name: Set SELinux context for WSGI socket directory (RedHat family)
-      sefcontext:
-        target: '/var/run/wsgi(/.*)?'
-        setype: httpd_var_run_t
-        state: present
-      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      notify: Restore wsgi socket dir SELinux context
-
-    - name: Determine and Enable wsgi module (Debian family)
-      block: # ... (이전과 동일)
-        - name: Check for wsgi_py3 module availability (Debian family)
-          stat: path="/etc/apache2/mods-available/wsgi_py3.load"
-          register: wsgi_py3_load_file_stat
-        - name: Check for wsgi (generic) module availability (Debian family) - fallback
-          stat: path="/etc/apache2/mods-available/wsgi.load"
-          register: wsgi_load_file_stat
-          when: not wsgi_py3_load_file_stat.stat.exists
-        - name: Set correct wsgi module name for a2enmod (Debian family)
-          set_fact:
-            apache_wsgi_module_name_debian: >-
-              {%- if wsgi_py3_load_file_stat.stat.exists -%}wsgi_py3
-              {%- elif wsgi_load_file_stat.stat.exists -%}wsgi
-              {%- else -%}{%- endif -%}
-        - name: Enable wsgi module on Debian family
-          command: "a2enmod {{ apache_wsgi_module_name_debian }}"
-          args:
-            creates: "/etc/apache2/mods-enabled/{{ apache_wsgi_module_name_debian }}.load"
-          when: apache_wsgi_module_name_debian is defined and apache_wsgi_module_name_debian != ""
-          notify: Restart Apache
-          changed_when: true
-      when: ansible_os_family == "Debian"
-
-    - name: Create Django project
-      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ."
-      args:
-        chdir: "{{ project_root_dir }}"
-        creates: "{{ project_root_dir }}/manage.py"
-      become: yes
-      become_user: "{{ target_project_user }}"
-
-    - name: Configure Django settings
-      lineinfile:
-        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        insertafter: "{{ item.insertafter | default(omit) }}"
-        insertbefore: "{{ item.insertbefore | default(omit) }}"
-        create: no
-      loop: # (이전과 동일)
-        - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
-        - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" }
-        - { regexp: "^STATIC_URL = .*", line: "STATIC_URL = '/static/'", insertafter: "^BASE_DIR = .*" }
-        - { regexp: "^STATIC_ROOT = .*", line: "STATIC_ROOT = BASE_DIR / 'staticfiles'", insertafter: "STATIC_URL = '/static/'" }
-        - { regexp: "^MEDIA_URL = .*", line: "MEDIA_URL = '/media/'", insertafter: "STATIC_ROOT = BASE_DIR / 'staticfiles'" }
-        - { regexp: "^MEDIA_ROOT = .*", line: "MEDIA_ROOT = BASE_DIR / 'mediafiles'", insertafter: "MEDIA_URL = '/media/'" }
-      become: yes
-
-    - name: Ensure Django settings.py ownership and permissions
-      file:
-        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
-        owner: "{{ target_project_user }}"
-        group: "{{ target_project_user }}"
+    - name: Download Apache config template
+      get_url:
+        url: "{{ apache_conf_template_download_url }}"
+        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         mode: '0644'
 
-    - name: Create staticfiles and mediafiles directories
-      file:
-        path: "{{ project_root_dir }}/{{ item }}"
-        state: directory
-        owner: "{{ target_project_user }}"
-        group: "{{ target_project_user }}"
-        mode: '0755'
-      loop:
-        - staticfiles
-        - mediafiles
-
-    - name: Collect static files
-      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
-      args:
-        chdir: "{{ project_root_dir }}"
-      become: yes
-      become_user: "{{ target_project_user }}"
-      environment:
-        PYTHONPATH: "{{ project_root_dir }}"
-        DJANGO_SETTINGS_MODULE: "{{ django_project_config_name }}.settings"
-
-    - name: Set ACLs for Apache to access project directories
-      acl:
-        path: "{{ item.path }}"
-        entity: "{{ apache_group }}"
-        etype: group
-        permissions: "{{ item.permissions }}"
-        state: present
-        recursive: "{{ item.recursive | default(false) }}"
-      loop:
-        - { path: "{{ project_base_dir }}", permissions: "rX" } # recursive false by default
-        - { path: "{{ project_root_dir }}", permissions: "rX", recursive: true }
-        - { path: "{{ venv_dir }}", permissions: "rX", recursive: true }
-      when: ansible_os_family != "Darwin"
-
-    - name: Set ACL for Apache access #per
-      acl:
-        path: "{{ item.path }}"
-        entity: "{{ apache_group }}"
-        etype: groups
-        permissions: "{{ item.permissions }}"
-        state: present
-      loop:
-        - { path: "{{ project_owner_home }}", permissions: "x" }
-        - { path: "{{ project_root_dir }}", permissions: "rX" }
-  
-
-    - name: Deploy Apache virtual host configuration for Django
+    - name: Deploy Apache virtual host config
       template:
-        src: "{{ downloaded_apache_conf_path }}"
+        src: "/tmp/{{ apache_conf_template_downloaded_filename }}"
         remote_src: yes
         dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
         owner: root
@@ -473,127 +214,14 @@
         mode: '0644'
       notify: Restart Apache
 
-    # --- SELinux 설정 (Boolean 테스트 집중) ---
-    - name: Configure SELinux Booleans for Apache (RedHat family only)
-      block:
-        - name: Ensure policycoreutils package is installed (SELinux Boolean Test)
-          yum:
-            name: "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
-            state: present
-          ignore_errors: no
-
-        - name: Debug Current SELinux Booleans BEFORE set (SELinux Boolean Test)
-          command: "getsebool httpd_enable_homedirs httpd_execmem httpd_can_network_connect"
-          register: initial_booleans
-          changed_when: false
-          failed_when: initial_booleans.rc != 0 and "Cannot get boolean" not in initial_booleans.stderr
-          ignore_errors: yes
-
-        - name: Configure SELinux for home directory access #per
-          seboolean:
-            name: httpd_enable_homedirs
-            state: yes
-            persistent: yes
-          when: ansible_os_family == 'RedHat'
-
-        - name: Apply file context to project directory #per
-          sefcontext:
-            target: "{{ project_root_dir }}(/.*)?"
-            setype: httpd_sys_content_t
-          notify: restorecon_project_dir
-
-        - name: Show Initial SELinux Booleans (SELinux Boolean Test)
-          debug:
-            var: initial_booleans.stdout_lines
-          when: initial_booleans.stdout is defined and initial_booleans.stdout != ""
-
-        - name: Set httpd_enable_homedirs to on VIA COMMAND (SELinux Boolean Test)
-          command: setsebool -P httpd_enable_homedirs on
-          register: result_set_homedirs
-          changed_when: result_set_homedirs.rc == 0
-          failed_when: result_set_homedirs.rc != 0
-          ignore_errors: no
-
-        - name: Debug set_homedirs_cmd_result (SELinux Boolean Test)
-          debug:
-            var: result_set_homedirs
-            verbosity: 1
-
-        - name: Set httpd_execmem to on VIA COMMAND (SELinux Boolean Test)
-          command: setsebool -P httpd_execmem on
-          register: result_set_execmem
-          changed_when: result_set_execmem.rc == 0
-          failed_when: result_set_execmem.rc != 0
-          ignore_errors: no
-
-        - name: Debug set_execmem_cmd_result (SELinux Boolean Test)
-          debug:
-            var: set_execmem_cmd_result
-            verbosity: 1
-
-        - name: Set httpd_can_network_connect to on VIA COMMAND (SELinux Boolean Test)
-          command: setsebool -P httpd_can_network_connect on
-          register: result_set_network_connect
-          changed_when: result_set_network_connect.rc == 0
-          failed_when: result_set_network_connect.rc != 0
-          ignore_errors: no
-
-        - name: Debug set_network_cmd_result (SELinux Boolean Test)
-          debug:
-            var: result_set_network_connect
-            verbosity: 1
-
-        - name: PAUSE for 30 seconds to allow manual check, or see next debug output
-          pause:
-            seconds: 30
-            prompt: |
-              SELinux Booleans have been (attempted to be) set.
-              The playbook will now verify their current status.
-              You can also manually check in the VM:
-              'sudo getsebool httpd_enable_homedirs httpd_execmem httpd_can_network_connect'
-              Press Enter to continue.
-
-        - name: Verify SELinux Booleans AFTER set (SELinux Boolean Test)
-          command: "getsebool httpd_enable_homedirs httpd_execmem httpd_can_network_connect"
-          register: final_booleans
-          changed_when: false
-          failed_when: final_booleans.rc != 0 and "Cannot get boolean" not in final_booleans.stderr
-          ignore_errors: yes
-
-        - name: Show FINAL SELinux Booleans (SELinux Boolean Test)
-          debug:
-            var: final_booleans.stdout_lines
-          when: final_booleans.stdout is defined and final_booleans.stdout != ""
-
-        # --- 아래 File Contexts 정의 및 적용 부분은 이번 테스트에서는 모두 주석 처리 또는 삭제 ---
-        # - name: Define SELinux context for project root ...
-        #   sefcontext: ...
-        # - name: Define SELinux context for media directory ...
-        #   sefcontext: ...
-        # - name: Define SELinux context for venv directory ...
-        #   sefcontext: ...
-        # - name: Define SELinux context for mod_wsgi.so ...
-        #   sefcontext: ...
-        # - name: Apply SELinux context to project directories and venv ...
-        #   command: restorecon ...
-
-      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      ignore_errors: yes # 블록 전체 ignore_errors는 boolean 테스트 후 문제 지속 시 no로 변경 고려
-
-    - name: Clean up downloaded Apache template and directory
-      file:
-        path: "{{ downloaded_templates_dir }}"
-        state: absent
-      when: downloaded_templates_dir is defined and downloaded_templates_dir != "/" and downloaded_templates_dir != (ansible_user_dir | default(''))
+    - name: Start and enable Apache
+      service:
+        name: "{{ apache_service_name }}"
+        state: started
+        enabled: yes
 
   handlers:
     - name: Restart Apache
       service:
         name: "{{ apache_service_name }}"
         state: restarted
-      become: yes
-
-    - name: Restore wsgi socket dir SELinux context
-      command: "restorecon -Rv /var/run/wsgi"
-      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      become: yes
