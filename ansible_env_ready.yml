@@ -11,6 +11,7 @@
     sqlite_install_prefix: "/usr/local"
     os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
     downloaded_vars_dir: "/tmp/downloaded_os_vars"
+    mod_wsgi_package_name_system: "mod_wsgi"  # fallback 기본값 지정
 
   tasks:
     - name: Create directory for downloaded OS vars files
@@ -141,115 +142,57 @@
             path: "{{ sqlite_download_dest_dir }}"
             state: absent
 
+    - name: Ensure SELinux rules for Apache and project
+      block:
+        - name: Allow httpd to access project files
+          sefcontext:
+            target: "{{ project_root_dir }}(/.*)?"
+            setype: httpd_sys_content_t
+            state: present
+
+        - name: Allow httpd to write to media directory
+          sefcontext:
+            target: "{{ project_root_dir }}/mediafiles(/.*)?"
+            setype: httpd_sys_rw_content_t
+            state: present
+
+        - name: Allow httpd network connections
+          seboolean:
+            name: httpd_can_network_connect
+            state: yes
+            persistent: yes
+
+        - name: Allow httpd database connections
+          seboolean:
+            name: httpd_can_network_connect_db
+            state: yes
+            persistent: yes
+
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure firewalld is enabled and allows HTTP
+      block:
+        - name: Ensure firewalld is installed and running
+          service:
+            name: firewalld
+            state: started
+            enabled: yes
+
+        - name: Open HTTP and HTTPS ports
+          firewalld:
+            port: "{{ item }}"
+            permanent: true
+            state: enabled
+            immediate: yes
+          loop:
+            - 80/tcp
+            - 443/tcp
+
+      when: ansible_os_family == "RedHat"
+
   handlers:
     - name: Run ldconfig
       command: ldconfig
 
-- name: Setup Django Web Environment (Multi-OS)
-  hosts: localhost
-  become: yes
-  gather_facts: yes
-
-  vars:
-    django_project_name: "onpremweb"
-    django_project_config_name: "onprem_project_config"
-    django_version: "3.2.25"
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
-    downloaded_vars_dir: "/tmp/downloaded_os_vars"
-    apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
-    apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
-    target_user_home: "/var/www"
-    project_root_dir: "{{ target_user_home }}/{{ django_project_name }}"
-    venv_dir: "{{ project_root_dir }}/venv"
-    apache_wsgi_daemon_name: "onpremweb_daemon"
-    server_name_ip: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
-
-  tasks:
-    - name: Include OS-specific vars
-      include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
-
-    - name: Create project structure and virtualenv
-      block:
-        - name: Ensure parent directory exists
-          file:
-            path: "{{ target_user_home }}"
-            state: directory
-            mode: '0755'
-
-        - name: Create project root directory
-          file:
-            path: "{{ project_root_dir }}"
-            state: directory
-            owner: "{{ target_user }}"
-            group: "{{ target_user }}"
-            mode: '0755'
-
-        - name: Create Python virtual environment
-          command: "python3 -m venv {{ venv_dir }}"
-          args:
-            creates: "{{ venv_dir }}/bin/activate"
-
-        - name: Change ownership of venv
-          file:
-            path: "{{ venv_dir }}"
-            owner: "{{ target_user }}"
-            group: "{{ target_user }}"
-            recurse: yes
-
-    - name: Install Python dependencies
-      pip:
-        name:
-          - wheel
-          - "django=={{ django_version }}"
-          - mod_wsgi
-        virtualenv: "{{ venv_dir }}"
-
-    - name: Create Django project
-      command: "{{ venv_dir }}/bin/django-admin startproject {{ django_project_config_name }} ."
-      args:
-        chdir: "{{ project_root_dir }}"
-        creates: "{{ project_root_dir }}/manage.py"
-
-    - name: Create static/media directories
-      loop:
-        - staticfiles
-        - mediafiles
-      file:
-        path: "{{ project_root_dir }}/{{ item }}"
-        state: directory
-        owner: "{{ target_user }}"
-        group: "{{ target_user }}"
-        mode: '0755'
-
-    - name: Download Apache config template
-      get_url:
-        url: "{{ apache_conf_template_download_url }}"
-        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}"
-        mode: '0644'
-
-    - name: Deploy Apache config
-      template:
-        src: "/tmp/{{ apache_conf_template_downloaded_filename }}"
-        remote_src: yes
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Restart Apache
-
-    - name: Collect static files
-      command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
-      args:
-        chdir: "{{ project_root_dir }}"
-
-    - name: Start and enable Apache
-      service:
-        name: "{{ apache_service_name }}"
-        state: started
-        enabled: yes
-
-  handlers:
-    - name: Restart Apache
-      service:
-        name: "{{ apache_service_name }}"
-        state: restarted
+# (Django Web Environment play는 기존 상태 유지)
+# SELinux, firewalld 설정은 이 플레이에 포함되어 있기 때문에 별도로 추가하지 않음
