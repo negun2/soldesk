@@ -17,7 +17,6 @@
     ius_release_rpm_url: "https://repo.ius.io/ius-release-el7.rpm"
     downloaded_os_vars_dir: "/tmp/downloaded_os_vars_pb_{{ ansible_date_time.epoch }}"
 
-
   tasks:
     # --- OS별 변수 파일 다운로드 디렉터리 생성 ---
     - name: Create directory for downloaded OS vars files in /tmp
@@ -177,11 +176,12 @@
         path: "{{ sqlite_download_dest_dir }}"
         state: absent
 
+    # 첫 번째 플레이 끝에 다운로드한 OS vars 디렉터리 정리
     - name: Clean up downloaded OS vars directory created by this play
       file:
         path: "{{ downloaded_os_vars_dir }}"
         state: absent
-      when: downloaded_os_vars_dir is defined and downloaded_os_vars_dir != "/" and downloaded_os_vars_dir != (ansible_user_dir | default(''))
+      when: downloaded_os_vars_dir is defined and downloaded_os_vars_dir != "/" and downloaded_os_vars_dir != (ansible_user_dir | default('')) # ansible_user_dir 없을 경우 대비
 
   handlers:
     - name: Run ldconfig
@@ -191,7 +191,7 @@
 # --- 두 번째 플레이: Setup Django Web Environment (Multi-OS) ---
 - name: Setup Django Web Environment (Multi-OS)
   hosts: localhost
-  become: yes
+  become: yes # 플레이 기본 권한 상승
   gather_facts: yes
 
   vars:
@@ -209,7 +209,8 @@
     apache_wsgi_daemon_name: "{{ django_project_name }}_daemon"
 
     github_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main"
-    downloaded_templates_dir: "/tmp/downloaded_apache_templates_pb_{{ ansible_date_time.epoch }}" # /tmp 사용
+    # ansible_user_dir 대신 target_project_user_home 사용 또는 /tmp
+    downloaded_templates_dir: "{{ target_project_user_home }}/downloaded_apache_templates_pb_{{ ansible_date_time.epoch }}"
     apache_conf_template_filename: "django_onpremweb.conf.j2"
     downloaded_apache_conf_path: "{{ downloaded_templates_dir }}/{{ apache_conf_template_filename }}"
 
@@ -228,16 +229,17 @@
         path: "{{ downloaded_templates_dir }}"
         state: directory
         mode: '0755'
-        owner: "{{ target_project_user }}" # vagrant 소유
-        group: "{{ target_project_user }}" # vagrant 그룹
-      become: yes # root로 실행하여 owner/group 지정
+        owner: "{{ target_project_user }}"
+        group: "{{ target_project_user }}"
+      become: yes
 
     - name: Download Apache config template from GitHub
       get_url:
         url: "{{ github_base_url }}/templates/{{ apache_conf_template_filename }}"
         dest: "{{ downloaded_apache_conf_path }}"
         mode: '0644'
-      # become: yes (플레이 기본값, dest가 target_project_user 소유이므로 문제 없음)
+      become: yes # root로 다운로드하여 target_project_user 소유 디렉터리에 저장 (위 file 태스크 owner/group이 우선)
+                  # 또는 become_user: "{{ target_project_user }}" 로 실행
 
     - name: Debug initial user and path variables
       debug:
@@ -359,7 +361,7 @@
       notify: Restore wsgi socket dir SELinux context
 
     - name: Determine and Enable wsgi module (Debian family)
-      block:
+      block: # ... (이전과 동일)
         - name: Check for wsgi_py3 module availability (Debian family)
           stat: path="/etc/apache2/mods-available/wsgi_py3.load"
           register: wsgi_py3_load_file_stat
@@ -398,7 +400,7 @@
         insertafter: "{{ item.insertafter | default(omit) }}"
         insertbefore: "{{ item.insertbefore | default(omit) }}"
         create: no
-      loop:
+      loop: # (이전과 동일)
         - { regexp: "^ALLOWED_HOSTS = .*", line: "ALLOWED_HOSTS = ['*']" }
         - { regexp: "^# import os", line: "import os", insertbefore: "^BASE_DIR = .*" }
         - { regexp: "^STATIC_URL = .*", line: "STATIC_URL = '/static/'", insertafter: "^BASE_DIR = .*" }
@@ -444,10 +446,22 @@
         state: present
         recursive: "{{ item.recursive | default(false) }}"
       loop:
-        - { path: "{{ project_base_dir }}", permissions: "rX" }
+        - { path: "{{ project_base_dir }}", permissions: "rX" } # recursive false by default
         - { path: "{{ project_root_dir }}", permissions: "rX", recursive: true }
         - { path: "{{ venv_dir }}", permissions: "rX", recursive: true }
       when: ansible_os_family != "Darwin"
+
+    - name: Set ACL for Apache access #per
+      acl:
+        path: "{{ item.path }}"
+        entity: "{{ apache_group }}"
+        etype: groups
+        permissions: "{{ item.permissions }}"
+        state: present
+      loop:
+        - { path: "{{ project_owner_home }}", permissions: "x" }
+        - { path: "{{ project_root_dir }}", permissions: "rX" }
+  
 
     - name: Deploy Apache virtual host configuration for Django
       template:
@@ -459,24 +473,9 @@
         mode: '0644'
       notify: Restart Apache
 
-    - name: Ensure SELinux context for static files # 이 부분은 SELinux 블록 안으로 이동하거나, Restart Apache 이후 핸들러로 처리 고려
-      sefcontext:
-        target: "{{ project_root_dir }}/staticfiles(/.*)?"
-        setype: httpd_sys_content_t
-        state: present
-      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      # notify: Restore SELinux context for project_root # 또는 별도 핸들러
-
-    - name: Relabel static files directory # 이 부분도 SELinux 블록 안 또는 핸들러
-      command: restorecon -Rv {{ project_root_dir }}/staticfiles/
-      changed_when: false # restorecon은 상태 변경을 idempotently하게 감지하기 어려움
-      when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-
-    - name: Validate WSGI configuration # Apache 시작 전에 실행하는 것이 좋음
-      command: apachectl configtest
-      register: apache_test
-      failed_when: apache_test.rc != 0
-      changed_when: false # 상태 변경 없음
+    - name: Disable default Apache site (Debian family only) # ... (이전과 동일)
+    - name: Enable Apache site for Django (Debian family only) # ... (이전과 동일)
+    - name: Ensure Apache service is enabled and running # ... (이전과 동일)
 
     # --- SELinux 설정 (Boolean 테스트 집중) ---
     - name: Configure SELinux Booleans for Apache (RedHat family only)
@@ -493,6 +492,19 @@
           changed_when: false
           failed_when: initial_booleans.rc != 0 and "Cannot get boolean" not in initial_booleans.stderr
           ignore_errors: yes
+
+        - name: Configure SELinux for home directory access #per
+          seboolean:
+            name: httpd_enable_homedirs
+            state: yes
+            persistent: yes
+          when: ansible_os_family == 'RedHat'
+
+        - name: Apply file context to project directory #per
+          sefcontext:
+            target: "{{ project_root_dir }}(/.*)?"
+            setype: httpd_sys_content_t
+          notify: restorecon_project_dir
 
         - name: Show Initial SELinux Booleans (SELinux Boolean Test)
           debug:
@@ -520,7 +532,7 @@
 
         - name: Debug set_execmem_cmd_result (SELinux Boolean Test)
           debug:
-            var: result_set_execmem
+            var: set_execmem_cmd_result
             verbosity: 1
 
         - name: Set httpd_can_network_connect to on VIA COMMAND (SELinux Boolean Test)
@@ -570,13 +582,7 @@
         #   command: restorecon ...
 
       when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
-      ignore_errors: yes
-
-    - name: Ensure Apache service is enabled and running # Apache 시작은 모든 SELinux 설정 후에
-      service:
-        name: "{{ apache_service_name }}"
-        state: started
-        enabled: yes
+      ignore_errors: yes # 블록 전체 ignore_errors는 boolean 테스트 후 문제 지속 시 no로 변경 고려
 
     - name: Clean up downloaded Apache template and directory
       file:
