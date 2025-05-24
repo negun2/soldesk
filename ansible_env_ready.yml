@@ -1,24 +1,48 @@
 ---
-- name: Setup Base System and Dependencies (Rocky Linux 9)
+- name: Ensure ansible.cfg enforces safe temp directory
   hosts: localhost
-  gather_facts: yes
-  become: yes
+  gather_facts: no
+  tasks:
+    - name: Create ansible.cfg with safe remote_tmp
+      copy:
+        dest: "{{ playbook_dir }}/ansible.cfg"
+        content: |
+          [defaults]
+          remote_tmp = /tmp/ansible
+        mode: '0644'
 
+- name: Setup Base System, PostgreSQL, Django Web Environment
+  hosts: localhost
+  become: yes
+  gather_facts: yes
   vars:
-    user_name: vagrant
+    user_name: "{{ ansible_user | default('ec2-user') }}"
     user_home: "/home/{{ user_name }}"
-    sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
-    sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
-    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
-    sqlite_install_prefix: "/usr/local"
     postgres_user: "django"
     postgres_password: "changeme123"
     postgres_db: "onpremwebdb"
     allowed_host_domain: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
+    sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
+    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
+    sqlite_install_prefix: "/usr/local"
+    django_project_name: "onpremweb"
+    django_project_config_name: "onprem_project_config"
+    django_version: "3.2.25"
+    project_root_dir: "{{ user_home }}/{{ django_project_name }}"
+    venv_dir: "{{ project_root_dir }}/venv"
+    apache_conf_template: "/etc/httpd/conf.d/{{ django_project_name }}.conf"
+    apache_wsgi_daemon_name: "onpremweb_daemon"
     secret_key_path: "{{ user_home }}/.django_secret.key"
 
   tasks:
-    - name: Install required system packages
+    - name: Ensure /tmp/ansible directory exists
+      file:
+        path: /tmp/ansible
+        state: directory
+        mode: '0777'
+
+    - name: Install system packages
       dnf:
         name:
           - epel-release
@@ -35,7 +59,10 @@
           - postgresql-server
           - postgresql-contrib
           - postgresql-devel
+          - python3-psycopg2
           - firewalld
+          - httpd
+          - mod_wsgi
         state: present
 
     - name: Start and enable firewalld
@@ -78,77 +105,23 @@
         state: started
         enabled: yes
 
-    - name: Set PostgreSQL password for user
-      become: yes
+    - name: Create PostgreSQL user
       become_user: postgres
       environment:
         ANSIBLE_REMOTE_TEMP: /tmp/ansible
-      postgresql_user:
+      community.postgresql.postgresql_user:
         name: "{{ postgres_user }}"
         password: "{{ postgres_password }}"
-        db: "{{ postgres_db }}"
         role_attr_flags: "LOGIN CREATEDB"
         state: present
 
-    - name: Create PostgreSQL DB
+    - name: Create PostgreSQL database
       become_user: postgres
-      postgresql_db:
+      environment:
+        ANSIBLE_REMOTE_TEMP: /tmp/ansible
+      community.postgresql.postgresql_db:
         name: "{{ postgres_db }}"
-
-    - name: Download and compile SQLite
-      block:
-        - name: Create download directory
-          file:
-            path: "{{ sqlite_download_dest_dir }}"
-            state: directory
-
-        - name: Download SQLite
-          get_url:
-            url: "{{ sqlite_download_url }}"
-            dest: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
-
-        - name: Extract SQLite
-          unarchive:
-            src: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
-            dest: "{{ sqlite_download_dest_dir }}"
-            remote_src: yes
-          register: sqlite_unarchive_result
-
-        - name: Compile and install SQLite
-          command: "{{ item }}"
-          args:
-            chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
-          loop:
-            - ./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5
-            - make -j$(nproc)
-            - make install
-
-- name: Setup Django Web Environment on Rocky Linux
-  hosts: localhost
-  become: yes
-  gather_facts: yes
-
-  vars:
-    user_name: "{{ ansible_user | default('ec2-user') }}"
-    user_home: "/home/{{ user_name }}"
-    django_project_name: "onpremweb"
-    django_project_config_name: "onprem_project_config"
-    django_version: "3.2.25"
-    project_root_dir: "{{ user_home }}/{{ django_project_name }}"
-    venv_dir: "{{ project_root_dir }}/venv"
-    apache_conf_template: "/etc/httpd/conf.d/{{ django_project_name }}.conf"
-    apache_wsgi_daemon_name: "onpremweb_daemon"
-    secret_key_path: "{{ user_home }}/.django_secret.key"
-    postgres_user: "django"
-    postgres_password: "changeme123"
-    postgres_db: "onpremwebdb"
-
-  tasks:
-    - name: Install Apache and mod_wsgi
-      dnf:
-        name:
-          - httpd
-          - mod_wsgi
+        owner: "{{ postgres_user }}"
         state: present
 
     - name: Ensure Apache is started and enabled
@@ -176,6 +149,7 @@
           - wheel
           - django=={{ django_version }}
           - psycopg2-binary
+          - python-dotenv
         virtualenv: "{{ venv_dir }}"
 
     - name: Create Django project
@@ -199,22 +173,39 @@
       args:
         creates: "{{ secret_key_path }}"
 
-    - name: Configure Django settings.py
+    - name: Create .env file for Django
+      copy:
+        dest: "{{ project_root_dir }}/.env"
+        content: |
+          SECRET_KEY={{ lookup('file', secret_key_path) }}
+          DEBUG=False
+          ALLOWED_HOSTS={{ allowed_host_domain }}
+          POSTGRES_DB={{ postgres_db }}
+          POSTGRES_USER={{ postgres_user }}
+          POSTGRES_PASSWORD={{ postgres_password }}
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0600'
+
+    - name: Configure Django settings.py to use .env
       blockinfile:
         path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
         marker: "# {mark} ANSIBLE MANAGED SETTINGS"
         block: |
           import os
-          with open('{{ secret_key_path }}') as f:
-              SECRET_KEY = f.read().strip()
-          DEBUG = False
-          ALLOWED_HOSTS = ['{{ allowed_host_domain }}']
+          from dotenv import load_dotenv
+          load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+          SECRET_KEY = os.getenv('SECRET_KEY')
+          DEBUG = os.getenv('DEBUG', 'False') == 'True'
+          ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
+
           DATABASES = {
               'default': {
                   'ENGINE': 'django.db.backends.postgresql_psycopg2',
-                  'NAME': '{{ postgres_db }}',
-                  'USER': '{{ postgres_user }}',
-                  'PASSWORD': '{{ postgres_password }}',
+                  'NAME': os.getenv('POSTGRES_DB'),
+                  'USER': os.getenv('POSTGRES_USER'),
+                  'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
                   'HOST': 'localhost',
                   'PORT': '5432',
               }
