@@ -1,31 +1,46 @@
 ---
-- name: Ensure ansible.cfg enforces safe temp directory
+# ansible_env_ready.yml
+- name: Ensure system-wide ansible.cfg with safe temp directory
   hosts: localhost
   gather_facts: no
+  become: yes
   tasks:
-    - name: Create ansible.cfg with safe remote_tmp
+    - name: Create /etc/ansible directory if missing
+      file:
+        path: /etc/ansible
+        state: directory
+        mode: '0755'
+
+    - name: Copy ansible.cfg to system-wide location
       copy:
-        dest: "{{ playbook_dir }}/ansible.cfg"
+        dest: /etc/ansible/ansible.cfg
         content: |
           [defaults]
           remote_tmp = /tmp/ansible
         mode: '0644'
+
+    - name: Ensure /tmp/ansible directory exists
+      file:
+        path: /tmp/ansible
+        state: directory
+        mode: '0777'
+
+    - name: Clean up old Ansible tmp directory if present
+      file:
+        path: /tmp/.ansible-vagrant-tmp
+        state: absent
 
 - name: Setup Base System, PostgreSQL, Django Web Environment
   hosts: localhost
   become: yes
   gather_facts: yes
   vars:
-    user_name: "{{ ansible_user | default('ec2-user') }}"
+    user_name: vagrant
     user_home: "/home/{{ user_name }}"
     postgres_user: "django"
     postgres_password: "changeme123"
     postgres_db: "onpremwebdb"
     allowed_host_domain: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
-    sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
-    sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
-    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
-    sqlite_install_prefix: "/usr/local"
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
@@ -36,12 +51,6 @@
     secret_key_path: "{{ user_home }}/.django_secret.key"
 
   tasks:
-    - name: Ensure /tmp/ansible directory exists
-      file:
-        path: /tmp/ansible
-        state: directory
-        mode: '0777'
-
     - name: Install system packages
       dnf:
         name:
@@ -52,6 +61,7 @@
           - gcc
           - git
           - wget
+          - curl
           - readline-devel
           - zlib-devel
           - libffi-devel
@@ -107,8 +117,6 @@
 
     - name: Create PostgreSQL user
       become_user: postgres
-      environment:
-        ANSIBLE_REMOTE_TEMP: /tmp/ansible
       community.postgresql.postgresql_user:
         name: "{{ postgres_user }}"
         password: "{{ postgres_password }}"
@@ -117,8 +125,6 @@
 
     - name: Create PostgreSQL database
       become_user: postgres
-      environment:
-        ANSIBLE_REMOTE_TEMP: /tmp/ansible
       community.postgresql.postgresql_db:
         name: "{{ postgres_db }}"
         owner: "{{ postgres_user }}"
