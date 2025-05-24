@@ -125,7 +125,7 @@
   gather_facts: yes
 
   vars:
-    user_name: vagrant
+    user_name: "{{ ansible_user | default('ec2-user') }}"
     user_home: "/home/{{ user_name }}"
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
