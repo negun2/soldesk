@@ -1,100 +1,95 @@
 ---
-- name: Setup Base System and Dependencies (Multi-OS)
+- name: Setup Base System and Dependencies (Rocky Linux 9)
   hosts: localhost
   gather_facts: yes
   become: yes
 
   vars:
+    user_name: vagrant
+    user_home: "/home/{{ user_name }}"
     sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
     sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
     sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
     sqlite_install_prefix: "/usr/local"
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
-    downloaded_vars_dir: "/tmp/downloaded_os_vars"
-    mod_wsgi_package_name_system: "mod_wsgi"
+    postgres_user: "django"
+    postgres_password: "changeme123"
+    postgres_db: "onpremwebdb"
+    allowed_host_domain: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    secret_key_path: "{{ user_home }}/.django_secret.key"
 
   tasks:
-    - name: Create directory for downloaded OS vars files
-      file:
-        path: "{{ downloaded_vars_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Download OS-specific var files from GitHub
-      get_url:
-        url: "{{ os_vars_base_url }}/{{ item }}"
-        dest: "{{ downloaded_vars_dir }}/{{ item }}"
-        mode: '0644'
-      loop:
-        - "RedHat.yml"
-        - "Debian.yml"
-      ignore_errors: yes
-
-    - name: Include OS-specific vars
-      include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
-
-    - name: Install IUS Community repository (RedHat family only)
-      yum:
-        name: "https://repo.ius.io/ius-release-el7.rpm"
-        state: present
-        disable_gpg_check: yes
-      when: ansible_os_family == "RedHat"
-
-    - name: Install base packages (RedHat)
-      yum:
+    - name: Install required system packages
+      dnf:
         name:
           - epel-release
           - python3
           - python3-pip
+          - python3-devel
           - gcc
-          - "{{ python_dev_package_name | default('python3-devel') }}"
-          - "{{ apache_package_name | default('httpd') }}"
-          - "{{ apache_dev_package_name | default('httpd-devel') }}"
-          - "{{ mod_wsgi_package_name_system | default('mod_wsgi') }}"
-          - "{{ python_virtualenv_package_name | default('python3-virtualenv') }}"
+          - git
           - wget
-          - "{{ readline_dev_package_name | default('readline-devel') }}"
-          - "{{ zlib_dev_package_name | default('zlib-devel') }}"
-          - "{{ libffi_dev_package_name | default('libffi-devel') }}"
-          - "{{ libssl_dev_package_name | default('openssl-devel') }}"
-          - "{{ policycoreutils_package_name | default('policycoreutils-python') }}"
+          - readline-devel
+          - zlib-devel
+          - libffi-devel
+          - openssl-devel
+          - postgresql-server
+          - postgresql-contrib
+          - postgresql-devel
+          - firewalld
         state: present
-      when: ansible_os_family == "RedHat"
 
-    - name: Install base packages (Debian)
-      apt:
-        name:
-          - python3
-          - python3-pip
-          - gcc
-          - "{{ python_dev_package_name | default('python3-dev') }}"
-          - "{{ apache_package_name | default('apache2') }}"
-          - "{{ apache_dev_package_name | default('apache2-dev') }}"
-          - "{{ mod_wsgi_package_name_system | default('libapache2-mod-wsgi-py3') }}"
-          - "{{ python_virtualenv_package_name | default('python3-venv') }}"
-          - wget
-          - "{{ readline_dev_package_name | default('libreadline-dev') }}"
-          - "{{ zlib_dev_package_name | default('zlib1g-dev') }}"
-          - "{{ libffi_dev_package_name | default('libffi-dev') }}"
-          - "{{ libssl_dev_package_name | default('libssl-dev') }}"
-          - "{{ apparmor_utils_package_name | default('apparmor-utils') }}"
-        state: present
-        update_cache: yes
-      when: ansible_os_family == "Debian"
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
 
-    - name: Install development tools
-      block:
-        - name: Install 'Development Tools' group (RedHat)
-          yum:
-            name: "@Development Tools"
-            state: present
-          when: ansible_os_family == "RedHat"
+    - name: Configure firewalld for PostgreSQL and HTTP/HTTPS
+      firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: yes
+      loop:
+        - 5432/tcp
+        - 80/tcp
+        - 443/tcp
 
-        - name: Install 'build-essential' (Debian)
-          apt:
-            name: build-essential
-            state: present
-          when: ansible_os_family == "Debian"
+    - name: Initialize PostgreSQL
+      command: postgresql-setup --initdb
+      args:
+        creates: /var/lib/pgsql/data/PG_VERSION
+
+    - name: Enable PostgreSQL listen_addresses
+      lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        regexp: '^#?listen_addresses'
+        line: "listen_addresses = '*'"
+
+    - name: Allow remote access in pg_hba.conf
+      lineinfile:
+        path: /var/lib/pgsql/data/pg_hba.conf
+        insertafter: '^# IPv4'
+        line: "host    all             all             0.0.0.0/0               md5"
+
+    - name: Start and enable PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Set PostgreSQL password for user
+      become_user: postgres
+      postgresql_user:
+        name: "{{ postgres_user }}"
+        password: "{{ postgres_password }}"
+        db: "{{ postgres_db }}"
+        priv: "ALL"
+
+    - name: Create PostgreSQL DB
+      become_user: postgres
+      postgresql_db:
+        name: "{{ postgres_db }}"
 
     - name: Download and compile SQLite
       block:
@@ -102,174 +97,81 @@
           file:
             path: "{{ sqlite_download_dest_dir }}"
             state: directory
-            mode: '0755'
 
-        - name: Download SQLite source
+        - name: Download SQLite
           get_url:
             url: "{{ sqlite_download_url }}"
             dest: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
-            mode: '0644'
-          register: sqlite_download_status
-          until: sqlite_download_status is succeeded
-          retries: 3
-          delay: 5
 
-        - name: Unarchive SQLite
+        - name: Extract SQLite
           unarchive:
             src: "{{ sqlite_download_dest_dir }}/{{ sqlite_downloaded_filename }}"
             dest: "{{ sqlite_download_dest_dir }}"
             remote_src: yes
           register: sqlite_unarchive_result
 
-        - name: Configure, build, and install SQLite
+        - name: Compile and install SQLite
           command: "{{ item }}"
           args:
             chdir: "{{ sqlite_unarchive_result.dest }}/{{ sqlite_downloaded_filename | basename | regex_replace('.tar.gz$', '') }}"
           loop:
-            - "./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5"
-            - "make -j{{ ansible_processor_vcpus | default(1) }}"
-            - "make install"
+            - ./configure --prefix={{ sqlite_install_prefix }} --enable-shared --enable-fts5
+            - make -j$(nproc)
+            - make install
 
-        - name: Configure dynamic linker for SQLite
-          copy:
-            content: "{{ sqlite_install_prefix }}/lib"
-            dest: /etc/ld.so.conf.d/sqlite3-custom.conf
-            mode: '0644'
-          notify: Run ldconfig
-
-        - name: Clean up SQLite source
-          file:
-            path: "{{ sqlite_download_dest_dir }}"
-            state: absent
-
-  handlers:
-    - name: Run ldconfig
-      command: ldconfig
-
-- name: Setup Django Web Environment (Multi-OS)
+- name: Setup Django Web Environment on Rocky Linux
   hosts: localhost
   become: yes
   gather_facts: yes
 
   vars:
+    user_name: vagrant
+    user_home: "/home/{{ user_name }}"
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
-    os_vars_base_url: "https://raw.githubusercontent.com/negun2/soldesk/main/vars"
-    downloaded_vars_dir: "/tmp/downloaded_os_vars"
-    apache_conf_template_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/templates/django_onpremweb.conf.j2"
-    apache_conf_template_downloaded_filename: "django_onpremweb.conf.j2"
-    target_user_home: "/var/www"
-    project_root_dir: "{{ target_user_home }}/{{ django_project_name }}"
+    project_root_dir: "{{ user_home }}/{{ django_project_name }}"
     venv_dir: "{{ project_root_dir }}/venv"
+    apache_conf_template: "/etc/httpd/conf.d/{{ django_project_name }}.conf"
     apache_wsgi_daemon_name: "onpremweb_daemon"
-    server_name_ip: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    secret_key_path: "{{ user_home }}/.django_secret.key"
     postgres_user: "django"
     postgres_password: "changeme123"
     postgres_db: "onpremwebdb"
 
   tasks:
-    - name: Include OS-specific vars
-      include_vars: "{{ downloaded_vars_dir }}/{{ ansible_os_family }}.yml"
-
-    - name: Install PostgreSQL server and client
-      package:
+    - name: Install Apache and mod_wsgi
+      dnf:
         name:
-          - postgresql
-          - postgresql-server
-          - postgresql-contrib
+          - httpd
+          - mod_wsgi
         state: present
-      when: ansible_os_family == "RedHat"
 
-    - name: Initialize PostgreSQL database (RedHat)
-      command: /usr/bin/postgresql-setup initdb
-      args:
-        creates: /var/lib/pgsql/data/PG_VERSION
-      when: ansible_os_family == "RedHat"
-
-    - name: Ensure PostgreSQL service is running
+    - name: Ensure Apache is started and enabled
       service:
-        name: postgresql
+        name: httpd
         state: started
         enabled: yes
 
-    - name: Create PostgreSQL database
-      become: yes
-      become_user: postgres
-      community.postgresql.postgresql_db:
-        name: "{{ postgres_db }}"
+    - name: Create project root directory
+      file:
+        path: "{{ project_root_dir }}"
+        state: directory
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0755'
 
-    - name: Create PostgreSQL user
-      become: yes
-      become_user: postgres
-      community.postgresql.postgresql_user:
-        name: "{{ postgres_user }}"
-        password: "{{ postgres_password }}"
-        db: "{{ postgres_db }}"
-        priv: "ALL"
-
-    - name: Configure Django to use PostgreSQL
-      blockinfile:
-        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
-        marker: "# {mark} ANSIBLE MANAGED DATABASE CONFIG"
-        block: |
-          DATABASES = {
-              'default': {
-                  'ENGINE': 'django.db.backends.postgresql_psycopg2',
-                  'NAME': '{{ postgres_db }}',
-                  'USER': '{{ postgres_user }}',
-                  'PASSWORD': '{{ postgres_password }}',
-                  'HOST': 'localhost',
-                  'PORT': '5432',
-              }
-          }
-
-    - name: Run Django migrations
-      command: "{{ venv_dir }}/bin/python manage.py migrate"
+    - name: Create Python virtual environment
+      command: python3 -m venv {{ venv_dir }}
       args:
-        chdir: "{{ project_root_dir }}"
+        creates: "{{ venv_dir }}/bin/activate"
 
-    - name: Create Django superuser
-      shell: |
-        echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | {{ venv_dir }}/bin/python manage.py shell
-      args:
-        chdir: "{{ project_root_dir }}"
-
-    - name: Create project structure and virtualenv
-      block:
-        - name: Ensure parent directory exists
-          file:
-            path: "{{ target_user_home }}"
-            state: directory
-            mode: '0755'
-
-        - name: Create project root directory
-          file:
-            path: "{{ project_root_dir }}"
-            state: directory
-            owner: "{{ target_user }}"
-            group: "{{ target_user }}"
-            mode: '0755'
-
-        - name: Create Python virtual environment
-          command: "python3 -m venv {{ venv_dir }}"
-          args:
-            creates: "{{ venv_dir }}/bin/activate"
-
-        - name: Change ownership of venv
-          file:
-            path: "{{ venv_dir }}"
-            owner: "{{ target_user }}"
-            group: "{{ target_user }}"
-            recurse: yes
-
-    - name: Install Python dependencies
+    - name: Install Python requirements
       pip:
         name:
           - wheel
-          - "django=={{ django_version }}"
+          - django=={{ django_version }}
           - psycopg2-binary
-          - mod_wsgi
         virtualenv: "{{ venv_dir }}"
 
     - name: Create Django project
@@ -285,85 +187,110 @@
       file:
         path: "{{ project_root_dir }}/{{ item }}"
         state: directory
-        owner: "{{ target_user }}"
-        group: "{{ target_user }}"
-        mode: '0755'
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
 
-    - name: Download Apache config template
-      get_url:
-        url: "{{ apache_conf_template_download_url }}"
-        dest: "/tmp/{{ apache_conf_template_downloaded_filename }}"
-        mode: '0644'
+    - name: Generate secret key if not exists
+      shell: "openssl rand -base64 48 > {{ secret_key_path }}"
+      args:
+        creates: "{{ secret_key_path }}"
 
-    - name: Deploy Apache config
-      template:
-        src: "/tmp/{{ apache_conf_template_downloaded_filename }}"
-        remote_src: yes
-        dest: "{{ apache_conf_dir }}/{{ django_project_name }}.conf"
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Restart Apache
+    - name: Configure Django settings.py
+      blockinfile:
+        path: "{{ project_root_dir }}/{{ django_project_config_name }}/settings.py"
+        marker: "# {mark} ANSIBLE MANAGED SETTINGS"
+        block: |
+          import os
+          with open('{{ secret_key_path }}') as f:
+              SECRET_KEY = f.read().strip()
+          DEBUG = False
+          ALLOWED_HOSTS = ['{{ allowed_host_domain }}']
+          DATABASES = {
+              'default': {
+                  'ENGINE': 'django.db.backends.postgresql_psycopg2',
+                  'NAME': '{{ postgres_db }}',
+                  'USER': '{{ postgres_user }}',
+                  'PASSWORD': '{{ postgres_password }}',
+                  'HOST': 'localhost',
+                  'PORT': '5432',
+              }
+          }
 
-    - name: Collect static files
-      command: "{{ venv_dir }}/bin/python {{ project_root_dir }}/manage.py collectstatic --noinput"
+    - name: Run Django migrate
+      command: "{{ venv_dir }}/bin/python manage.py migrate"
       args:
         chdir: "{{ project_root_dir }}"
 
-    - name: Ensure SELinux rules for Apache and project
-      block:
-        - name: Allow httpd to access project files
-          sefcontext:
-            target: "{{ project_root_dir }}(/.*)?"
-            setype: httpd_sys_content_t
-            state: present
+    - name: Create Django superuser
+      shell: |
+        echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | {{ venv_dir }}/bin/python manage.py shell
+      args:
+        chdir: "{{ project_root_dir }}"
 
-        - name: Allow httpd to write to media directory
-          sefcontext:
-            target: "{{ project_root_dir }}/mediafiles(/.*)?"
-            setype: httpd_sys_rw_content_t
-            state: present
+    - name: Collect static files
+      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
+      args:
+        chdir: "{{ project_root_dir }}"
 
-        - name: Allow httpd network connections
-          seboolean:
-            name: httpd_can_network_connect
-            state: yes
-            persistent: yes
+    - name: Set SELinux context for Django project
+      sefcontext:
+        target: "{{ project_root_dir }}(/.*)?"
+        setype: httpd_sys_content_t
+        state: present
 
-        - name: Allow httpd database connections
-          seboolean:
-            name: httpd_can_network_connect_db
-            state: yes
-            persistent: yes
-      when: ansible_os_family == "RedHat"
+    - name: Set SELinux context for mediafiles
+      sefcontext:
+        target: "{{ project_root_dir }}/mediafiles(/.*)?"
+        setype: httpd_sys_rw_content_t
+        state: present
 
-    - name: Ensure firewalld is enabled and allows HTTP
-      block:
-        - name: Ensure firewalld is installed and running
-          service:
-            name: firewalld
-            state: started
-            enabled: yes
+    - name: Enable SELinux booleans
+      seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: yes
+      loop:
+        - httpd_can_network_connect
+        - httpd_can_network_connect_db
 
-        - name: Open HTTP and HTTPS ports
-          firewalld:
-            port: "{{ item }}"
-            permanent: true
-            state: enabled
-            immediate: yes
-          loop:
-            - 80/tcp
-            - 443/tcp
-      when: ansible_os_family == "RedHat"
+    - name: Create Apache config file
+      copy:
+        dest: "{{ apache_conf_template }}"
+        content: |
+          WSGIDaemonProcess {{ apache_wsgi_daemon_name }} \
+            user={{ user_name }} group={{ user_name }} \
+            python-home={{ venv_dir }} \
+            python-path={{ project_root_dir }}:{{ project_root_dir }}/{{ django_project_config_name }}:/usr/lib/python3.9/site-packages \
+            processes=2 threads=5 maximum-requests=1000 display-name=%{GROUP}
 
-    - name: Start and enable Apache
-      service:
-        name: "{{ apache_service_name }}"
-        state: started
-        enabled: yes
+          <VirtualHost *:80>
+              ServerName {{ allowed_host_domain }}
+              Alias /static/ {{ project_root_dir }}/staticfiles/
+              <Directory {{ project_root_dir }}/staticfiles>
+                  Require all granted
+              </Directory>
+
+              Alias /media/ {{ project_root_dir }}/mediafiles/
+              <Directory {{ project_root_dir }}/mediafiles>
+                  Require all granted
+              </Directory>
+
+              WSGIScriptAlias / {{ project_root_dir }}/{{ django_project_config_name }}/wsgi.py
+              WSGIProcessGroup {{ apache_wsgi_daemon_name }}
+              WSGIApplicationGroup %{GLOBAL}
+              <Directory {{ project_root_dir }}/{{ django_project_config_name }}>
+                  <Files wsgi.py>
+                      Require all granted
+                  </Files>
+              </Directory>
+
+              ErrorLog /var/log/httpd/onpremweb-error.log
+              CustomLog /var/log/httpd/onpremweb-access.log combined
+          </VirtualHost>
+      notify: Restart Apache
 
   handlers:
     - name: Restart Apache
       service:
-        name: "{{ apache_service_name }}"
+        name: httpd
         state: restarted
