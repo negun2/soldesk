@@ -34,13 +34,19 @@
   hosts: localhost
   become: yes
   gather_facts: yes
+  environment:
+    ANSIBLE_REMOTE_TEMP: /var/tmp/ansible  # <- /tmp 대신 안전한 경로 지정
   vars:
-    user_name: vagrant
+    user_name: "{{ ansible_user | default('ec2-user') }}"
     user_home: "/home/{{ user_name }}"
     postgres_user: "django"
     postgres_password: "changeme123"
     postgres_db: "onpremwebdb"
     allowed_host_domain: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    sqlite_download_url: "https://raw.githubusercontent.com/negun2/soldesk/main/files/sqlite-snapshot-202505171106.tar.gz"
+    sqlite_downloaded_filename: "sqlite-snapshot-202505171106.tar.gz"
+    sqlite_download_dest_dir: "/tmp/sqlite_downloaded"
+    sqlite_install_prefix: "/usr/local"
     django_project_name: "onpremweb"
     django_project_config_name: "onprem_project_config"
     django_version: "3.2.25"
@@ -51,6 +57,11 @@
     secret_key_path: "{{ user_home }}/.django_secret.key"
 
   tasks:
+    - name: Ensure /var/tmp/ansible directory exists  # <- 추가
+      file:
+        path: /var/tmp/ansible
+        state: directory
+        mode: '0777'
     - name: Install system packages
       dnf:
         name:
