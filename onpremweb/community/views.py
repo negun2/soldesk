@@ -39,6 +39,7 @@ def post_update(request, pk):
         form = PostForm(instance=post)
     return render(request, 'community/post_form.html', {'form': form})
 
+@login_required
 def post_delete(request, pk):
     post = get_object_or_404(Post, pk=pk)
     if request.method == 'POST':
@@ -51,7 +52,9 @@ def post_create(request):
     if request.method == 'POST':
         form = PostForm(request.POST)
         if form.is_valid():
-            form.save()
+            post = form.save(commit=False)
+            post.author = request.user
+            post.save()
             return redirect('community:post_list')
     else:
         form = PostForm()
