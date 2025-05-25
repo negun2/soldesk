@@ -5,7 +5,7 @@ from community.views import signup
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    path('',             TemplateView.as_view(template_name='index.html'), name='home'),
+    path('', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('admin/',       admin.site.urls),
     path('signup/',      signup,   name='signup'),
     path('login/',       auth_views.LoginView.as_view(template_name='login.html'), name='login'),
