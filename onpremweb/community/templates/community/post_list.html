@@ -1,0 +1,21 @@
+<!-- community/templates/community/post_list.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h1>커뮤니티</h1>
+  <ul>
+    {% for post in posts %}
+      <li>
+        <strong>{{ post.title }}</strong><br>
+        {{ post.content|truncatewords:20 }}...
+      </li>
+    {% empty %}
+      <li>아직 게시물이 없습니다.</li>
+    {% endfor %}
+  </ul>
+  <a href="{% url 'signup' %}">회원가입</a> |
+  {% if user.is_authenticated %}
+    <a href="{% url 'logout' %}">로그아웃</a>
+  {% else %}
+    <a href="{% url 'login' %}">로그인</a>
+  {% endif %}
+{% endblock %}
