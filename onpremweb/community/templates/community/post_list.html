@@ -1,21 +1,26 @@
-<!-- community/templates/community/post_list.html -->
 {% extends "base.html" %}
 {% block content %}
-  <h1>커뮤니티</h1>
+  <h1>글 목록</h1>
+  <p><a href="{% url 'community:create' %}">새 글 작성</a></p>
   <ul>
     {% for post in posts %}
       <li>
-        <strong>{{ post.title }}</strong><br>
-        {{ post.content|truncatewords:20 }}...
+        <a href="{% url 'community:detail' post.pk %}">{{ post.title }}</a>
+        ({{ post.created_at|date:"Y-m-d H:i" }})
       </li>
     {% empty %}
-      <li>아직 게시물이 없습니다.</li>
+      <li>등록된 글이 없습니다.</li>
     {% endfor %}
   </ul>
-  <a href="{% url 'signup' %}">회원가입</a> |
-  {% if user.is_authenticated %}
-    <a href="{% url 'logout' %}">로그아웃</a>
-  {% else %}
-    <a href="{% url 'login' %}">로그인</a>
+  {% if is_paginated %}
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}">이전</a>
+      {% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">다음</a>
+      {% endif %}
+    </div>
   {% endif %}
 {% endblock %}
