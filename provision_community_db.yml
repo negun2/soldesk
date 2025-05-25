@@ -1,0 +1,41 @@
+# playbook: provision_community_db.yml
+# hosts: localhost (on-prem Postgres 서버)
+# become: yes
+
+- name: Provision simple community DB
+  hosts: localhost
+  become: yes
+  gather_facts: no
+
+  vars:
+    community_user: community_user
+    community_password: secret123   # 원하는 암호로 변경
+    community_db: communitydb
+
+  tasks:
+    - name: Create community DB user
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ community_user }}"
+        password: "{{ community_password }}"
+        state: present
+
+    - name: Create community DB
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ community_db }}"
+        owner: "{{ community_user }}"
+        state: present
+
+    - name: Create posts table
+      become_user: postgres
+      community.postgresql.postgresql_query:
+        login_db: "{{ community_db }}"
+        login_user: postgres
+        query: |
+          CREATE TABLE IF NOT EXISTS posts (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+          );
