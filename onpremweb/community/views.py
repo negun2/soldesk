@@ -18,7 +18,7 @@ def post_detail(request, pk):
     post = get_object_or_404(Post, pk=pk)
     return render(request, 'community/post_detail.html', {'post': post})
 
-def post_create(request):
+def post_from(request):
     if request.method == 'POST':
         form = PostForm(request.POST)
         if form.is_valid():
@@ -52,10 +52,10 @@ def post_create(request):
         form = PostForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('post_list')
+            return redirect('community:post_list')
     else:
         form = PostForm()
-    return render(request, 'community/post_create.html', {'form': form})
+    return render(request, 'community/post_form.html',   {'form': form})
 
 def signup(request):
     if request.method == 'POST':
