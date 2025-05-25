@@ -5,6 +5,7 @@ from .models import Post
 from .forms import PostForm
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy
+from django.core.exceptions import PermissionDenied
 from django.views.generic import (
     ListView, DetailView,
     CreateView, UpdateView, DeleteView
@@ -31,7 +32,8 @@ def post_from(request):
 def post_update(request, pk):
     post = get_object_or_404(Post, pk=pk)
     if post.author != request.user:
-        return HttpResponseForbidden("삭제 권한이 없습니다.")
+        # 본인이 아니면 403
+        raise PermissionDenied()
     if request.method == 'POST':
         form = PostForm(request.POST, instance=post)
         if form.is_valid():
@@ -45,7 +47,8 @@ def post_update(request, pk):
 def post_delete(request, pk):
     post = get_object_or_404(Post, pk=pk)
     if post.author != request.user:
-        return HttpResponseForbidden("삭제 권한이 없습니다.")
+        # 본인이 아니면 403
+        raise PermissionDenied()
     if request.method == 'POST':
         post.delete()
         return redirect('community:post_list')
