@@ -1,0 +1,18 @@
+<!-- onpremweb/onpremweb/templates/base.html -->
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>On-Prem Web</title>
+</head>
+<body>
+  {% if user.is_authenticated %}
+    안녕하세요, {{ user.username }} | <a href="{% url 'logout' %}?next={{ request.path }}">로그아웃</a>
+  {% else %}
+    <a href="{% url 'login' %}">로그인</a> | <a href="{% url 'signup' %}">회원가입</a>
+  {% endif %}
+  <hr>
+  {% block content %}{% endblock %}
+</body>
+</html>
