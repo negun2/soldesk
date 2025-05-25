@@ -1,4 +1,7 @@
 from django.contrib import admin
-from .models import Category
+from .models import Post
 
-admin.site.register(Category)
+@admin.register(Post)
+class PostAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'created_at')
+    ordering     = ('-created_at',)
