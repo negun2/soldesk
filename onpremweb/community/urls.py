@@ -8,9 +8,9 @@ from .views import (
 app_name = 'community'
 
 urlpatterns = [
-    path('', PostListView.as_view(), name='list'),
-    path('post/<int:pk>/', PostDetailView.as_view(), name='detail'),
-    path('post/new/', PostCreateView.as_view(), name='create'),
-    path('post/<int:pk>/edit/', PostUpdateView.as_view(), name='update'),
-    path('post/<int:pk>/delete/', PostDeleteView.as_view(), name='delete'),
+    path('', views.post_list, name='post_list'),
+    path('post/<int:pk>/', views.post_detail,   name='post_detail'),
+    path('post/new/',    views.post_create,    name='post_create'),
+    path('post/<int:pk>/edit/',   views.post_update, name='post_update'),
+    path('post/<int:pk>/delete/', views.post_delete, name='post_delete'),
 ]
