@@ -49,7 +49,7 @@ TEMPLATES = [
 ]
 LOGIN_REDIRECT_URL = '/community/'
 LOGIN_URL = 'login'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = 'community:post_list'
 
 WSGI_APPLICATION = 'onprem_project_config.wsgi.application'
 
