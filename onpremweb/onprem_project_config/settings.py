@@ -9,8 +9,6 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
 
-LOGIN_REDIRECT_URL = '/community/'
-LOGIN_URL = 'login'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -37,7 +35,7 @@ ROOT_URLCONF = 'onprem_project_config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [ BASE_DIR / 'templates' ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -49,6 +47,8 @@ TEMPLATES = [
         },
     },
 ]
+LOGIN_REDIRECT_URL = 'home'
+LOGIN_URL = 'login'
 
 WSGI_APPLICATION = 'onprem_project_config.wsgi.application'
 
