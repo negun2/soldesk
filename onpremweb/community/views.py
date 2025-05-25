@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 from .models import Post
@@ -9,35 +9,6 @@ from django.views.generic import (
     ListView, DetailView,
     CreateView, UpdateView, DeleteView
 )
-
-class PostListView(ListView):
-    model = Post
-    template_name = 'community/post_list.html'
-    context_object_name = 'posts'
-    paginate_by = 10
-
-class PostDetailView(DetailView):
-    model = Post
-    template_name = 'community/post_detail.html'
-
-class PostCreateView(CreateView):
-    model = Post
-    fields = ['title','content']
-    form_class = PostForm
-    template_name = 'community/post_form.html'
-    success_url = reverse_lazy('community:list')
-
-class PostUpdateView(UpdateView):
-    model = Post
-    fields = ['title','content']
-    form_class = PostForm
-    template_name = 'community/post_form.html'
-    success_url = reverse_lazy('community:list')
-
-class PostDeleteView(DeleteView):
-    model = Post
-    template_name = 'community/post_confirm_delete.html'
-    success_url = reverse_lazy('community:list')
 
 def post_list(request):
     posts = Post.objects.order_by('-created_at')
