@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ object.title }}</h1>
+  <p>{{ object.content }}</p>
+  <p><small>{{ object.created_at }}</small></p>
+  <p>
+    <a href="{% url 'community:update' object.pk %}">수정</a> |
+    <a href="{% url 'community:delete' object.pk %}">삭제</a> |
+    <a href="{% url 'community:list' %}">목록으로</a>
+  </p>
+{% endblock %}
