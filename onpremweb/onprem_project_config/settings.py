@@ -9,6 +9,9 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
 
+LOGIN_REDIRECT_URL = '/community/'
+LOGIN_URL = 'login'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
