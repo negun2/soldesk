@@ -27,9 +27,11 @@ def post_from(request):
     else:
         form = PostForm()
     return render(request, 'community/post_form.html', {'form': form})
-
+@login_required
 def post_update(request, pk):
     post = get_object_or_404(Post, pk=pk)
+    if post.author != request.user:
+        return HttpResponseForbidden("삭제 권한이 없습니다.")
     if request.method == 'POST':
         form = PostForm(request.POST, instance=post)
         if form.is_valid():
@@ -42,6 +44,8 @@ def post_update(request, pk):
 @login_required
 def post_delete(request, pk):
     post = get_object_or_404(Post, pk=pk)
+    if post.author != request.user:
+        return HttpResponseForbidden("삭제 권한이 없습니다.")
     if request.method == 'POST':
         post.delete()
         return redirect('community:post_list')
