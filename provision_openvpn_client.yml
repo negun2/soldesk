@@ -1,7 +1,8 @@
 ---
 # provision_openvpn_client.yml
 - name: Configure OpenVPN client on on-prem Vagrant VM
-  hosts: onprem
+  hosts: localhost
+  connection: local
   become: yes
   vars:
     # OpenVPN 서버 공인 IP 또는 도메인
