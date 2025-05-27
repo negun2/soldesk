@@ -1,5 +1,5 @@
 # ansible_env_ready.yml
-# 수정 22: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
+# 수정 23: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
 - name: Setup PostgreSQL, Django App, Apache with venv mod_wsgi on Rocky Linux
   hosts: localhost
   become: yes
@@ -15,6 +15,9 @@
     postgres_password: "changeme123"
     postgres_db: "onpremwebdb"
     venv_dir: "{{ app_home }}/venv"
+    openvpn_user: "client"
+    openvpn_pass: "soldesk"
+    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행        
 
   tasks:
     - name: Install system packages
@@ -110,27 +113,6 @@
         version: "{{ repo_version }}"
         force: yes
 
-    - name: Update project code to latest
-      git:
-        repo: "{{ repo_url }}"
-        dest: "{{ app_home }}"
-        version: "{{ repo_version }}"
-        force: yes
-        update: yes
-      notify: Reload Apache
-
-    - name: Make migrations for community app
-      command: "{{ venv_dir }}/bin/python manage.py makemigrations community"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-      notify: Reload Apache
-
-    - name: Apply migrations
-      command: "{{ venv_dir }}/bin/python manage.py migrate"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-      notify: Reload Apache
-
     - name: Create Python virtual environment
       command: python3 -m venv {{ venv_dir }}
       args:
@@ -145,6 +127,15 @@
       pip:
         name: psycopg2-binary
         virtualenv: "{{ venv_dir }}"
+
+    - name: Update project code to latest
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_home }}"
+        version: "{{ repo_version }}"
+        force: yes
+        update: yes
+      notify: Reload Apache
 
     - name: Copy .env example
       copy:
@@ -161,6 +152,26 @@
         - { regexp: '^POSTGRES_DB',       line: "POSTGRES_DB={{ postgres_db }}" }
         - { regexp: '^POSTGRES_USER',     line: "POSTGRES_USER={{ postgres_user }}" }
         - { regexp: '^POSTGRES_PASSWORD', line: "POSTGRES_PASSWORD={{ postgres_password }}" }
+
+    - name: Ensure ALLOWED_HOSTS in .env
+      lineinfile:
+        path: "{{ app_home }}/{{ repo_subdir }}/.env"
+        regexp: '^ALLOWED_HOSTS='
+        line: "ALLOWED_HOSTS=localhost,127.0.0.1,192.168.8.10"
+        create: yes
+
+    - name: Make migrations for community app
+      command: "{{ venv_dir }}/bin/python manage.py makemigrations community"
+      args:
+        chdir: "{{ app_home }}/{{ repo_subdir }}"
+      notify: Reload Apache
+
+    - name: Apply migrations
+      command: "{{ venv_dir }}/bin/python manage.py migrate"
+      args:
+        chdir: "{{ app_home }}/{{ repo_subdir }}"
+      notify: Reload Apache
+
 
     - name: Generate Django SECRET_KEY
       command: "openssl rand -hex 32"
@@ -179,13 +190,6 @@
         path: "{{ app_home }}/{{ repo_subdir }}/.env"
         regexp: '^DEBUG='
         line: "DEBUG=True"
-        create: yes
-
-    - name: Ensure ALLOWED_HOSTS in .env
-      lineinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/.env"
-        regexp: '^ALLOWED_HOSTS='
-        line: "ALLOWED_HOSTS=localhost,127.0.0.1,192.168.8.10"
         create: yes
 
     - name: Run Django migrations
@@ -348,7 +352,65 @@
     - name: Allow Apache to connect to network databases (SELinux) via command
       command: setsebool -P httpd_can_network_connect_db 1
 
+    # ------------------------
+    # OpenVPN client 설치/구성
+    # ------------------------
+    - block:
+        - name: Install OpenVPN client
+          dnf:
+            name: openvpn
+            state: present
 
+        - name: Create OpenVPN client directory
+          file:
+            path: /etc/openvpn/client
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Copy client.ovpn to VM
+          copy:
+            src: files/client.ovpn
+            dest: /etc/openvpn/client.conf
+            mode: '0600'
+
+        - name: Create OpenVPN auth file
+          copy:
+            dest: /etc/openvpn/userpass.txt
+            content: "{{ openvpn_user }}\n{{ openvpn_pass }}\n"
+            mode: '0600'
+
+        - name: Ensure auth-user-pass directive in client.conf
+          lineinfile:
+            path: /etc/openvpn/client.conf
+            regexp: '^auth-user-pass'
+            line: 'auth-user-pass /etc/openvpn/userpass.txt'
+            insertafter: '^remote '
+
+        - name: Kill any existing OpenVPN client process
+          shell: "pkill openvpn || true"
+
+        - name: Start OpenVPN client in background
+          shell: >
+            nohup openvpn --config /etc/openvpn/client.conf --daemon \
+            2>&1 >/var/log/openvpn-client.log
+          args:
+            executable: /bin/bash
+
+        - name: Wait for tun0 interface
+          shell: |
+            for i in {1..10}; do ip addr show tun0 && exit 0; sleep 1; done
+            exit 1
+          register: tun_check
+          failed_when: tun_check.rc != 0
+
+        - name: Add AWS VPC route via tun0
+          command: ip route replace 172.16.0.0/16 dev tun0
+      when: openvpn_enabled
+      tags: openvpn
+
+    # 마지막에 Apache 재시작 등 핸들러
     - name: Start/restart Apache
       service:
         name: httpd
