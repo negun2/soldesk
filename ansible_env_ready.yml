@@ -17,7 +17,7 @@
     venv_dir: "{{ app_home }}/venv"
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
+    openvpn_enabled: true     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
 
   tasks:
     - name: Install system packages
@@ -153,11 +153,21 @@
         - { regexp: '^POSTGRES_USER',     line: "POSTGRES_USER={{ postgres_user }}" }
         - { regexp: '^POSTGRES_PASSWORD', line: "POSTGRES_PASSWORD={{ postgres_password }}" }
 
+    - name: Get private IP
+      command: hostname -I
+      register: my_ip
+
+    #- name: Get public IP
+    #  shell: curl -s http://169.254.169.254/latest/meta-data/public-ipv4
+    #  register: my_public_ip
+    #  failed_when: false
+    #  changed_when: false
+
     - name: Ensure ALLOWED_HOSTS in .env
       lineinfile:
         path: "{{ app_home }}/{{ repo_subdir }}/.env"
         regexp: '^ALLOWED_HOSTS='
-        line: "ALLOWED_HOSTS=localhost,127.0.0.1,192.168.8.10"
+        line: "ALLOWED_HOSTS=localhost,127.0.0.1,192.168.8.10,{{ my_ip.stdout.split()[0] }},ganggong.negun.xyz"
         create: yes
 
     - name: Make migrations for community app
