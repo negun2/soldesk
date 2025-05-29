@@ -17,7 +17,7 @@
     venv_dir: "{{ app_home }}/venv"
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행        
+    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
 
   tasks:
     - name: Install system packages
@@ -231,6 +231,12 @@
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: "0755"
+
+    - name: Remove default Apache index.html (disable HTTP Server Test Page)
+      file:
+        path: /var/www/html/index.html
+        state: absent
+
 
     - name: Deploy index.html into templates
       copy:
