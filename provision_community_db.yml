@@ -8,9 +8,9 @@
   gather_facts: no
 
   vars:
-    community_user: community_user
-    community_password: secret123   # 원하는 암호로 변경
-    community_db: communitydb
+    community_user: django
+    community_password: changeme123   # 원하는 암호로 변경
+    community_db: onpremwebdb
 
   tasks:
     - name: Create community DB user
