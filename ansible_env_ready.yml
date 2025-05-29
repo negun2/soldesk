@@ -17,7 +17,7 @@
     venv_dir: "{{ app_home }}/venv"
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: true     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
+    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
 
   tasks:
     - name: Install system packages
