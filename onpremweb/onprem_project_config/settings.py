@@ -56,9 +56,9 @@ WSGI_APPLICATION = 'onprem_project_config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'communitydb',
-        'USER': 'community_user',
-        'PASSWORD': 'secret123',
+        'NAME': 'onpremwebdb',
+        'USER': 'django',
+        'PASSWORD': 'changeme123',
         'HOST': '192.168.8.10',
         'PORT': '5432',
     }
