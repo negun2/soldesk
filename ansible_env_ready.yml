@@ -1,5 +1,5 @@
 # ansible_env_ready.yml
-# 수정 23: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
+# 수정 25: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
 - name: Setup PostgreSQL, Django App, Apache with venv mod_wsgi on Rocky Linux
   hosts: localhost
   become: yes
@@ -17,7 +17,7 @@
     venv_dir: "{{ app_home }}/venv"
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: true     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
+    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
 
   tasks:
     - name: Install system packages
