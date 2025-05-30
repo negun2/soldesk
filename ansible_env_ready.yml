@@ -1,5 +1,5 @@
 # ansible_env_ready.yml
-# 수정 24: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
+# 수정 23: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
 - name: Setup PostgreSQL, Django App, Apache with venv mod_wsgi on Rocky Linux
   hosts: localhost
   become: yes
@@ -17,7 +17,7 @@
     venv_dir: "{{ app_home }}/venv"
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
+    openvpn_enabled: true     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
 
   tasks:
     - name: Install system packages
@@ -324,21 +324,40 @@
           </VirtualHost>
       notify: Reload Apache
 
-    - name: Set SELinux context (ignore failures)
-      command: semanage fcontext -a -t httpd_sys_content_t '{{ app_home }}(/.*)?'
+    - name: Ensure semanage command available
+      package:
+        name: policycoreutils-python-utils
+        state: present
+
+    - name: Set SELinux file contexts for web content and venv
+      block:
+        - command: semanage fcontext -a -t httpd_sys_content_t '{{ app_home }}(/.*)?'
+        - command: semanage fcontext -a -t httpd_sys_script_exec_t '{{ venv_dir }}(/.*)?'
+        - command: restorecon -Rv '{{ app_home }}'
+        - command: restorecon -Rv '{{ venv_dir }}'
       ignore_errors: yes
 
-    - name: Allow HTTPD to execute Python modules in venv
-      command: semanage fcontext -a -t httpd_sys_script_exec_t '{{ venv_dir }}(/.*)?'
-      ignore_errors: yes
+    - name: Set SELinux booleans for Apache
+      block:
+        - seboolean:
+            name: httpd_can_network_connect
+            state: yes
+            persistent: yes
 
-    - name: Restore SELinux context on venv
-      command: restorecon -Rv '{{ venv_dir }}'
-      ignore_errors: yes
+        - seboolean:
+            name: httpd_can_network_connect_db
+            state: yes
+            persistent: yes
 
-    - name: Restore SELinux context (ignore failures)
-      command: restorecon -Rv '{{ app_home }}'
-      ignore_errors: yes
+        - seboolean:
+            name: httpd_execmem
+            state: yes
+            persistent: yes
+
+        - seboolean:
+            name: httpd_unified
+            state: yes
+            persistent: yes
 
     - name: Ensure Apache ServerName set
       lineinfile:
@@ -366,14 +385,6 @@
         msg: "{{ apache_syntax.stderr_lines }}"
       when: apache_syntax.rc != 0
 
-    - name: Allow Apache to connect to network databases (SELinux)
-      seboolean:
-        name: httpd_can_network_connect_db
-        state: yes
-        persistent: yes
-
-    - name: Allow Apache to connect to network databases (SELinux) via command
-      command: setsebool -P httpd_can_network_connect_db 1
 
     # ------------------------
     # OpenVPN client 설치/구성
