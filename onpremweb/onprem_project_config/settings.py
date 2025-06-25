@@ -2,16 +2,31 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-ENV_PATH = Path(__file__).resolve().parent / '.env'
-print("Checking ENV file at:", ENV_PATH)
+# settings.py 파일 위치 기준
+current_file = os.path.abspath(__file__)
+print("Django settings file:", current_file)
+
+# 프로젝트 루트(Base dir)를 settings.py의 두 단계 상위로 잡습니다.
+BASE_DIR = Path(current_file).resolve().parent.parent
+print("Computed BASE_DIR:", BASE_DIR)
+
+# .env는 BASE_DIR 아래에 있어야 하므로
+ENV_PATH = BASE_DIR / '.env'
+print("Looking for .env at:", ENV_PATH)
 print("ENV file exists?:", ENV_PATH.exists())
-load_dotenv(ENV_PATH)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# 실제 로드
+load_dotenv(str(ENV_PATH))
 
+# 이후 환경변수 사용
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
+
+# ALLOWED_HOSTS 안전하게 분리
+raw_hosts = os.getenv('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = raw_hosts.split(',') if raw_hosts else []
+
+print("Loaded ALLOWED_HOSTS:", ALLOWED_HOSTS)
 
 
 INSTALLED_APPS = [
