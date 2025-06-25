@@ -2,8 +2,12 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+ENV_PATH = Path(__file__).resolve().parent / '.env'
+print("Checking ENV file at:", ENV_PATH)
+print("ENV file exists?:", ENV_PATH.exists())
+load_dotenv(ENV_PATH)
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
@@ -17,7 +21,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    #'rest_framework',
     'community',
 ]
 
@@ -57,11 +60,11 @@ WSGI_APPLICATION = 'onprem_project_config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'onpremwebdb',
-        'USER': 'django',
-        'PASSWORD': 'changeme123',
-        'HOST': '192.168.8.10',
-        'PORT': '5432',
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PORT': os.getenv('POSTGRES_PORT', '5432'),
     }
 }
 
