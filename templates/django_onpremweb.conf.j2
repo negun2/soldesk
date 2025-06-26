@@ -2,9 +2,9 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }}
   user={{ apache_user }} 
   group={{ apache_group }} 
   python-home={{ venv_dir }} 
-  python-path={{ project_root_dir }}:{{ project_root_dir }}/{{ django_project_config_name }}
-  processes=4 
-  threads=15 
+  python-path={{ venv_dir }}/lib/python3.7/site-packages:{{ project_root_dir }}:{{ project_root_dir }}/{{ django_project_config_name }}
+  processes=2
+  threads=5
   maximum-requests=1000 
   display-name=%{GROUP}
 
@@ -41,10 +41,11 @@ WSGIDaemonProcess {{ apache_wsgi_daemon_name }}
 
     # 상위 디렉토리 접근 제한
     <Directory {{ project_root_dir }}>
-        Options -Indexes
-        AllowOverride None
-        Require all denied
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
     </Directory>
+
 
     # 로그 관리
     ErrorLog "|/usr/sbin/rotatelogs -l {{ apache_log_dir }}/%Y%m%d-{{ django_project_name }}-error.log 86400"
