@@ -1,13 +1,24 @@
-from django.urls import path
-from .views import post_list, post_detail, post_create, post_update, post_delete
-from . import views
+# onpremweb/community/urls.py
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+from .views import (
+    AnalysisViewSet, BoardViewSet, RecommendViewSet, FeedbackViewSet,
+    BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
+    RegisterView
+)
 
-app_name = 'community'
+router = DefaultRouter()
+router.register(r'analysis', AnalysisViewSet)
+router.register(r'boards', BoardViewSet)
+router.register(r'recommends', RecommendViewSet)
+router.register(r'feedbacks', FeedbackViewSet)
+router.register(r'bestboards', BestBoardViewSet)
+router.register(r'notices', NoticeViewSet)
+router.register(r'replies', ReplyViewSet)
+router.register(r'scores', ScoreViewSet)
+router.register(r'errors', ErrorLogViewSet)
 
 urlpatterns = [
-    path('',           post_list,   name='post_list'),
-    path('new/',       post_create, name='post_create'),
-    path('<int:pk>/',  post_detail, name='post_detail'),
-    path('<int:pk>/edit/',   post_update, name='post_update'),
-    path('<int:pk>/delete/', post_delete, name='post_delete'),
+    path('api/', include(router.urls)),
+    path('register/', RegisterView.as_view(), name='register'),
 ]

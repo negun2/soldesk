@@ -1,79 +1,53 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import login
-from .models import Post
-from .forms import PostForm
-from django.contrib.auth.decorators import login_required
-from django.urls import reverse_lazy
-from django.core.exceptions import PermissionDenied
-from django.views.generic import (
-    ListView, DetailView,
-    CreateView, UpdateView, DeleteView
+# onpremweb/community/views.py
+from rest_framework import ( viewsets, generics )
+from .models import (
+    Analysis, Board, Recommend, Feedback, BestBoard,
+    Notice, Reply, Score, ErrorLog
 )
+from .serializers import (
+    AnalysisSerializer, BoardSerializer, RecommendSerializer,
+    FeedbackSerializer, BestBoardSerializer, NoticeSerializer,
+    ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
+)
+from django.contrib.auth.models import User
 
-def post_list(request):
-    posts = Post.objects.order_by('-created_at')
-    return render(request, 'community/post_list.html', {'posts': posts})
 
-def post_detail(request, pk):
-    post = get_object_or_404(Post, pk=pk)
-    return render(request, 'community/post_detail.html', {'post': post})
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()           # User 모델 전체를 대상으로 생성
+    serializer_class = RegisterSerializer
 
-def post_from(request):
-    if request.method == 'POST':
-        form = PostForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('community:post_list')
-    else:
-        form = PostForm()
-    return render(request, 'community/post_form.html', {'form': form})
-@login_required
-def post_update(request, pk):
-    post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        # 본인이 아니면 403
-        raise PermissionDenied()
-    if request.method == 'POST':
-        form = PostForm(request.POST, instance=post)
-        if form.is_valid():
-            form.save()
-            return redirect('community:post_detail', pk=post.pk)
-    else:
-        form = PostForm(instance=post)
-    return render(request, 'community/post_form.html', {'form': form})
+class AnalysisViewSet(viewsets.ModelViewSet):
+    queryset = Analysis.objects.all()
+    serializer_class = AnalysisSerializer
 
-@login_required
-def post_delete(request, pk):
-    post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        # 본인이 아니면 403
-        raise PermissionDenied()
-    if request.method == 'POST':
-        post.delete()
-        return redirect('community:post_list')
-    return render(request, 'community/post_confirm_delete.html', {'post': post})
-    
-@login_required
-def post_create(request):
-    if request.method == 'POST':
-        form = PostForm(request.POST)
-        if form.is_valid():
-            post = form.save(commit=False)
-            post.author = request.user
-            post.save()
-            return redirect('community:post_list')
-    else:
-        form = PostForm()
-    return render(request, 'community/post_form.html',   {'form': form})
+class BoardViewSet(viewsets.ModelViewSet):
+    queryset = Board.objects.all()
+    serializer_class = BoardSerializer
 
-def signup(request):
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect('home')     # 가입 후 홈으로
-    else:
-        form = UserCreationForm()
-    return render(request, 'signup.html', {'form': form})
+class RecommendViewSet(viewsets.ModelViewSet):
+    queryset = Recommend.objects.all()
+    serializer_class = RecommendSerializer
+
+class FeedbackViewSet(viewsets.ModelViewSet):
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackSerializer
+
+class BestBoardViewSet(viewsets.ModelViewSet):
+    queryset = BestBoard.objects.all()
+    serializer_class = BestBoardSerializer
+
+class NoticeViewSet(viewsets.ModelViewSet):
+    queryset = Notice.objects.all()
+    serializer_class = NoticeSerializer
+
+class ReplyViewSet(viewsets.ModelViewSet):
+    queryset = Reply.objects.all()
+    serializer_class = ReplySerializer
+
+class ScoreViewSet(viewsets.ModelViewSet):
+    queryset = Score.objects.all()
+    serializer_class = ScoreSerializer
+
+class ErrorLogViewSet(viewsets.ModelViewSet):
+    queryset = ErrorLog.objects.all()
+    serializer_class = ErrorLogSerializer
