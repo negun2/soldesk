@@ -5,6 +5,7 @@ from django.views.generic import TemplateView
 from django.contrib.auth import views as auth_views
 from community import urls as community_urls
 from community.views import (
+    current_user,
     AnalysisViewSet, BoardViewSet, RecommendViewSet,
     FeedbackViewSet, BestBoardViewSet, NoticeViewSet,
     ReplyViewSet, ScoreViewSet, ErrorLogViewSet
@@ -31,9 +32,8 @@ router.register(r'errors', ErrorLogViewSet, basename='errors')
 urlpatterns = [
     path('admin/', admin.site.urls),
     # 인증 관련
+    path('api/me/', current_user, name='current_user'),
     path('signup/', include('community.urls')),  # signup view는 community.urls 네임스페이스 안에 정의
-    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
     path('api-auth/', include('rest_framework.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
@@ -47,5 +47,5 @@ urlpatterns = [
     path('community/', include((community_urls, 'community'), namespace='community')),
 
     # SPA 진입점 (그 외 모든 URL)
-    re_path(r'^.*$', TemplateView.as_view(template_name='carkey_front/index.html'), name='spa'),
+    re_path(r'^.*$', TemplateView.as_view(template_name='index.html'), name='spa'),
 ]
