@@ -1,5 +1,8 @@
 # onpremweb/community/views.py
 from rest_framework import ( viewsets, generics )
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from .models import (
     Analysis, Board, Recommend, Feedback, BestBoard,
     Notice, Reply, Score, ErrorLog
@@ -11,6 +14,17 @@ from .serializers import (
 )
 from django.contrib.auth.models import User
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    """
+    GET /api/me/ 로 토큰 검증 및
+    현재 로그인된 사용자 정보를 반환
+    """
+    return Response({
+        'id': request.user.id,
+        'username': request.user.username,
+    })
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()           # User 모델 전체를 대상으로 생성
