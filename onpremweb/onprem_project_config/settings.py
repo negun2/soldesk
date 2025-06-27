@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'community',
 ]
 
@@ -66,9 +67,9 @@ TEMPLATES = [
         },
     },
 ]
-LOGIN_REDIRECT_URL = '/community/'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'community:post_list'
+LOGOUT_REDIRECT_URL = 'home'
 
 WSGI_APPLICATION = 'onprem_project_config.wsgi.application'
 
@@ -81,6 +82,12 @@ DATABASES = {
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': os.getenv('POSTGRES_PORT', '5432'),
     }
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -97,5 +104,7 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_collected')
+STATICFILES_DIRS = [ BASE_DIR / 'static' ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+#STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_collected')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
