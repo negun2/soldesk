@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AnalysisViewSet, BoardViewSet, RecommendViewSet, FeedbackViewSet,
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
-    RegisterView
+    RegisterView, current_user
 )
 
 router = DefaultRouter()
@@ -21,4 +21,5 @@ router.register(r'errors', ErrorLogViewSet)
 urlpatterns = [
     path('api/', include(router.urls)),
     path('register/', RegisterView.as_view(), name='register'),
+    path('me/', current_user, name='current_user'),  # /api/me/
 ]
