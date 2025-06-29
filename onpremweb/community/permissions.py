@@ -1,17 +1,14 @@
+# onpremweb/community/permissions.py
+
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 class IsAdminOrReadWriteBoard(BasePermission):
     """
-    - GET, POST, PUT, PATCH, DELETE: 로그인된 사용자는 모두 가능
-    - (특정 메소드 제한 필요시 아래에 추가)
+    읽기/쓰기는 로그인 사용자 모두,
+    수정/삭제는 관리자만
     """
     def has_permission(self, request, view):
-        # 로그인 사용자면 허용
-        return request.user and request.user.is_authenticated
-
-class IsAdminUserOnly(BasePermission):
-    """
-    관리자만 허용
-    """
-    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS or request.method == "POST":
+            return request.user and request.user.is_authenticated
+        # PUT/PATCH/DELETE만 관리자
         return request.user and request.user.is_staff
