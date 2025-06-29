@@ -4,9 +4,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .models import Board, BestBoard, Notice, Feedback, Analysis, Recommend, Reply, Score, ErrorLog
 from .serializers import BoardSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, \
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
-from .permissions import IsAdminOrReadWriteBoard, IsAdminUserOnly
-from rest_framework.permissions import IsAuthenticated
-# /api/me/
+from .permissions import IsAdminOrReadWriteBoard
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
@@ -19,7 +17,6 @@ def current_user(request):
         'id': request.user.id,
         'username': request.user.username,
         'is_staff': request.user.is_staff,
-        # 필요하면 기타 정보 추가
     })
 
 # 게시판(일반/베스트): 전체 사용자 허용 (쓰기 포함), 수정/삭제는 작성자/관리자만
@@ -72,4 +69,3 @@ class ErrorLogViewSet(viewsets.ModelViewSet):
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
-    # 일반 회원가입은 누구나(AllowAny, 필요시 추가)
