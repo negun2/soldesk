@@ -1,18 +1,17 @@
-# onpremweb/community/permissions.py
-
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 class IsAdminOrReadWriteBoard(BasePermission):
     """
-    베스트/일반 게시판: 모든 사용자가 읽기/쓰기 가능. 수정/삭제는 작성자나 staff만.
+    - GET, POST, PUT, PATCH, DELETE: 로그인된 사용자는 모두 가능
+    - (특정 메소드 제한 필요시 아래에 추가)
     """
     def has_permission(self, request, view):
-        # 로그인만 했으면 접근 가능 (쓰기까지 허용)
+        # 로그인 사용자면 허용
         return request.user and request.user.is_authenticated
 
-    def has_object_permission(self, request, view, obj):
-        # 읽기는 누구나
-        if request.method in SAFE_METHODS:
-            return True
-        # 수정/삭제는 작성자나 staff만
-        return obj.author == request.user or request.user.is_staff
+class IsAdminUserOnly(BasePermission):
+    """
+    관리자만 허용
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_staff
