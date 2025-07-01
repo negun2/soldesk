@@ -25,9 +25,9 @@ class BoardViewSet(viewsets.ModelViewSet):
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
-class BestBoardViewSet(viewsets.ModelViewSet):
-    queryset = BestBoard.objects.all()
-    serializer_class = BestBoardSerializer
+class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Board.objects.order_by('-recommend_count')[:10]   # 추천순 TOP 10
+    serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
 # 나머지 게시판: 관리자만
