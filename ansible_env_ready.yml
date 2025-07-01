@@ -1,27 +1,57 @@
+---
 # ansible_env_ready.yml
-# 수정 25: C-extension psycopg2 제거(python3-psycopg2), psycopg2-binary 설치, Apache conf 오타(“>>”) 수정
-- name: Setup PostgreSQL, Django App, Apache with venv mod_wsgi on Rocky Linux
+# Setup PostgreSQL, Django App, Apache with venv mod_wsgi on Amazon Linux 2
+
+- name: Setup PostgreSQL, Django App, Apache on Amazon Linux 2
   hosts: localhost
   become: yes
   gather_facts: yes
 
   vars:
+    db_host: "localhost"
+    ansible_python_interpreter: /usr/bin/python3
+    django_admin_user: admin
+    django_admin_email: admin@example.com
+    django_admin_password: changeme123
     app_user: "apache"
     app_home: "/var/www/onpremweb"
     repo_url: "https://github.com/negun2/soldesk.git"
     repo_version: "main"
-    repo_subdir: "onpremweb"
     postgres_user: "django"
     postgres_password: "changeme123"
+    postgres_super_password: "p@ssw0rd"
     postgres_db: "onpremwebdb"
     venv_dir: "{{ app_home }}/venv"
+    community_user: django
+    community_password: changeme123   # 원하는 암호로 변경
+    community_db: onpremwebdb
     openvpn_user: "client"
     openvpn_pass: "soldesk"
-    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행 아님 true로 설정       
-
+    openvpn_enabled: false     # 기본값 false → tags=openvpn 로만 실행
+  collections:
+    - ansible.posix
+    - community.postgresql
   tasks:
+    - name: Enable EPEL via amazon-linux-extras
+      shell: amazon-linux-extras enable epel -y
+      args:
+        creates: /etc/yum.repos.d/epel.repo
+
+    - name: Enable PostgreSQL 10 via amazon-linux-extras  # 수정: PostgreSQL extras 활성화
+      shell: amazon-linux-extras enable postgresql10 -y
+      args:
+        creates: /etc/yum.repos.d/amzn2-extras-postgresql10.repo
+
+    - name: Ensure app_home exists
+      file:
+        path: "{{ app_home }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
     - name: Install system packages
-      dnf:
+      yum:
         name:
           - epel-release
           - python3
@@ -35,50 +65,57 @@
           - zlib-devel
           - libffi-devel
           - openssl-devel
+          - postgresql
           - postgresql-server
           - postgresql-contrib
           - postgresql-devel
-          # - python3-psycopg2    ← 제거: mod_wsgi에서 C-extension 매핑 에러 방지
-          - firewalld
           - httpd
-          - python3-mod_wsgi
+          #- python3-mod_wsgi         # 수정: Amazon Linux 2용 mod_wsgi 패키지
           - httpd-devel
-          - policycoreutils-python-utils
+          - policycoreutils-python
+          - rsync
         state: present
+        update_cache: yes
 
-    - name: Ensure psycopg2 is available to Ansible
+    - name: Install Node.js 16 via NodeSource
+      shell: |
+        curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
+        yum install -y nodejs
+      args:
+        executable: /bin/bash
+      become: yes
+
+    - name: Install latest mod_wsgi via pip
       pip:
-        name: psycopg2-binary
+        name: mod_wsgi
         executable: pip3
 
-    - name: Stop and disable firewalld
-      service:
-        name: firewalld
-        state: stopped
-        enabled: no
+    - name: Generate Apache LoadModule config via mod_wsgi-express
+      command: mod_wsgi-express install-module
+      register: wsgi_module_conf
+      changed_when: "'LoadModule' in wsgi_module_conf.stdout"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"      
 
-    #- name: Start and enable firewalld
-     # service:
-      #  name: firewalld
-       # state: started
-        #enabled: yes
+    - name: Deploy mod_wsgi LoadModule config to Apache
+      copy:
+        dest: /etc/httpd/conf.modules.d/02-wsgi.conf
+        content: "{{ wsgi_module_conf.stdout }}\n"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload Apache
 
-    #- name: Open firewall ports
-     # firewalld:
-      #  port: "{{ item }}"
-       # permanent: yes
-        #state: enabled
-        #immediate: yes
-      #loop:
-       # - 5432/tcp
-        #- 80/tcp
-        #- 443/tcp
-        #- 22/tcp
-
-    - name: Initialize PostgreSQL database
-      command: postgresql-setup --initdb
+    - name: Initialize PostgreSQL database  # 수정: initdb 명령 경로
+      command: /usr/bin/postgresql-setup --initdb
       args:
         creates: /var/lib/pgsql/data/PG_VERSION
+
+    - name: Start and enable PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
 
     - name: Configure PostgreSQL listen_addresses
       lineinfile:
@@ -86,17 +123,41 @@
         regexp: '^#?listen_addresses'
         line: "listen_addresses = '*'"
 
-    - name: Allow remote access in pg_hba.conf
+    - name: Configure pg_hba for both socket(peer) and TCP(md5)
       lineinfile:
         path: /var/lib/pgsql/data/pg_hba.conf
-        insertafter: '^# IPv4'
-        line: "host    all             all             0.0.0.0/0               md5"
+        create: yes
+        insertafter: '^# "local" is for Unix domain socket connections only'
+        line: "{{ item }}"
+      loop:
+        - "local   all             all                                     peer"
+        - "host    all             all             127.0.0.1/32            md5"
+        - "host    all             all             0.0.0.0/0               md5"
 
-    - name: Start and enable PostgreSQL
+    - name: Reload PostgreSQL to apply pg_hba changes
       service:
         name: postgresql
-        state: started
-        enabled: yes
+        state: restarted
+
+    - name: Wait for PostgreSQL to be available after pg_hba reload
+      wait_for:
+        port: 5432
+        host: 127.0.0.1
+        delay: 2
+        timeout: 30
+
+    - name: Ensure psycopg2-binary is installed for system python3
+      pip:
+        name: psycopg2-binary
+        executable: pip3
+
+    - name: Set password for postgres superuser
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: "{{ postgres_super_password }}"
+        state: present
+        login_unix_socket: /var/run/postgresql
 
     - name: Create PostgreSQL user
       become_user: postgres
@@ -105,6 +166,10 @@
         password: "{{ postgres_password }}"
         role_attr_flags: "LOGIN,CREATEDB"
         state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+        login_unix_socket: ""
 
     - name: Create PostgreSQL database
       become_user: postgres
@@ -112,190 +177,190 @@
         name: "{{ postgres_db }}"
         owner: "{{ postgres_user }}"
         state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+        port: 5432
 
-    - name: Clone project repository
+    - name: Clone full repo to temp
       git:
         repo: "{{ repo_url }}"
-        dest: "{{ app_home }}"
+        dest: "/tmp/soldesk"
         version: "{{ repo_version }}"
         force: yes
 
-    - name: Create Python virtual environment
-      command: python3 -m venv {{ venv_dir }}
-      args:
-        creates: "{{ venv_dir }}/bin/activate"
+    - name: Sync only onpremweb subdir into app_home
+      synchronize:
+        src: "/tmp/soldesk/onpremweb/"
+        dest: "{{ app_home }}/"
+        rsync_opts:
+          - "--omit-dir-times"
+          - "--no-perms"
+        mode: push
 
-    - name: Install Python requirements
-      pip:
-        requirements: "{{ app_home }}/{{ repo_subdir }}/requirements.txt"
-        virtualenv: "{{ venv_dir }}"
-
-    - name: Install psycopg2-binary into venv
-      pip:
-        name: psycopg2-binary
-        virtualenv: "{{ venv_dir }}"
-
-    - name: Update project code to latest
-      git:
-        repo: "{{ repo_url }}"
-        dest: "{{ app_home }}"
-        version: "{{ repo_version }}"
-        force: yes
-        update: yes
-      notify: Reload Apache
-
-    - name: Copy .env example
-      copy:
-        src: "{{ app_home }}/{{ repo_subdir }}/.env.example"
-        dest: "{{ app_home }}/{{ repo_subdir }}/.env"
-        remote_src: yes
-
-    - name: Update .env with DB creds
-      lineinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/.env"
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-      loop:
-        - { regexp: '^POSTGRES_DB',       line: "POSTGRES_DB={{ postgres_db }}" }
-        - { regexp: '^POSTGRES_USER',     line: "POSTGRES_USER={{ postgres_user }}" }
-        - { regexp: '^POSTGRES_PASSWORD', line: "POSTGRES_PASSWORD={{ postgres_password }}" }
-
-    - name: Get private IP
-      command: hostname -I
-      register: my_ip
-
-    #- name: Get public IP
-    #  shell: curl -s http://169.254.169.254/latest/meta-data/public-ipv4
-    #  register: my_public_ip
-    #  failed_when: false
-    #  changed_when: false
-
-    - name: Ensure ALLOWED_HOSTS in .env
-      lineinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/.env"
-        regexp: '^ALLOWED_HOSTS='
-        line: "ALLOWED_HOSTS=localhost,127.0.0.1,192.168.8.10,{{ my_ip.stdout.split()[0] }},ganggong.negun.xyz"
-        create: yes
-
-    - name: Make migrations for community app
-      command: "{{ venv_dir }}/bin/python manage.py makemigrations community"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-      notify: Reload Apache
-
-    - name: Apply migrations
-      command: "{{ venv_dir }}/bin/python manage.py migrate"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-      notify: Reload Apache
-
-
-    - name: Generate Django SECRET_KEY
-      command: "openssl rand -hex 32"
-      register: django_secret
-      changed_when: false
-
-    - name: Ensure SECRET_KEY is set in .env
-      lineinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/.env"
-        regexp: '^SECRET_KEY='
-        line: "SECRET_KEY={{ django_secret.stdout }}"
-        create: yes
-
-    - name: Ensure DEBUG=True in .env
-      lineinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/.env"
-        regexp: '^DEBUG='
-        line: "DEBUG=True"
-        create: yes
-
-    - name: Run Django migrations
-      command: "{{ venv_dir }}/bin/python manage.py migrate"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-
-    - name: Pull community app updates
-      git:
-        repo: "https://github.com/negun2/soldesk.git"
-        dest: "{{ app_home }}"
-        version: "{{ repo_version }}"
-        force: yes
-
-    - name: Run makemigrations for community app
-      command: "{{ venv_dir }}/bin/python manage.py makemigrations community"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-
-    - name: Apply new migrations
-      command: "{{ venv_dir }}/bin/python manage.py migrate"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-
-    - name: Collect static files (update)
-      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"    
-
-    - name: Collect static files
-      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
-      args:
-        chdir: "{{ app_home }}/{{ repo_subdir }}"
-
-    - name: Ensure templates directory exists
+    - name: Ensure template directory exists
       file:
-        path: "{{ app_home }}/{{ repo_subdir }}/templates"
+        path: "{{ app_home }}/templates"
         state: directory
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: "0755"
 
-    - name: Remove default Apache index.html (disable HTTP Server Test Page)
+    - name: Deploy frontend index.html
+      copy:
+        src: "/tmp/soldesk/frontend_build/index.html"
+        dest: "{{ app_home }}/templates/index.html"
+        remote_src: yes
+
+    - name: Deploy frontend static files via rsync
+      synchronize:
+        src: "/tmp/soldesk/frontend_build/static/"
+        dest: "{{ app_home }}/staticfiles/"
+        archive: yes              # 파일 모드·타임스탬프·소유권까지 유지하며 재귀 복사
+        rsync_opts:
+          - "--omit-dir-times"
+          - "--no-perms"
+        mode: push
+
+    - name: Fix ownership for entire app directory
+      file:
+        path: "{{ app_home }}"
+        recurse: yes
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Remove temp clone
+      file:
+        path: /tmp/soldesk
+        state: absent
+        mode: push
+
+    - name: Create Python virtual environment (idempotent)
+      command: python3 -m venv {{ venv_dir }}
+      args:
+        creates: "{{ venv_dir }}/bin/activate"
+
+    - name: Install Python requirements into venv
+      pip:
+        virtualenv: "{{ venv_dir }}"
+        requirements: "{{ app_home }}/requirements.txt"
+
+    - name: Copy .env example
+      copy:
+        src: "{{ app_home }}/.env.example"
+        dest: "{{ app_home }}/.env"
+        remote_src: yes
+
+    - name: Check if SECRET_KEY exists in .env
+      shell: grep -q '^SECRET_KEY=' {{ app_home }}/.env
+      register: secret_key_check
+      ignore_errors: true
+
+    - name: Generate SECRET_KEY in .env if missing
+      lineinfile:
+        path: "{{ app_home }}/.env"
+        line: "SECRET_KEY={{ lookup('password', '/etc/ansible/secret.key length=50 chars=ascii_letters') }}"
+        insertafter: '^DEBUG='
+      when: secret_key_check.rc != 0
+
+    - name: Set db_host depending on AWS or not
+      set_fact:
+        db_host: "{{ '192.168.8.10' if is_aws else 'localhost' }}"
+      vars:
+        is_aws: "{{ lookup('file', '/sys/hypervisor/uuid') is search('ec2') }}"
+      ignore_errors: yes
+
+    - name: DEBUG db_host
+      debug:
+        var: db_host
+
+    - name: Update .env with DB creds and settings  # 수정: 단일 loop로 처리
+      lineinfile:
+        path: "{{ app_home }}/.env"
+        regexp: "^{{ item.key }}="
+        line: "{{ item.key }}={{ item.value }}"
+      loop:
+        - { key: 'POSTGRES_DB',       value: "{{postgres_db}}" }
+        - { key: 'POSTGRES_USER',     value: "{{ postgres_user }}" }
+        - { key: 'POSTGRES_PASSWORD', value: "{{ postgres_password }}" }
+        - { key: 'DEBUG',             value: 'True' }
+        - { key: 'POSTGRES_HOST',     value: "{{ db_host }}" }
+        - { key: 'ALLOWED_HOSTS',     value: "localhost,127.0.0.1,{{ ansible_default_ipv4.address }},ganggong.negun.xyz" }        
+
+    - name: Wait for PostgreSQL to be available
+      wait_for:
+        port: 5432
+        host: 127.0.0.1
+        delay: 2
+        timeout: 60
+
+    - name: Check .env content
+      shell: cat {{ app_home }}/.env
+      register: env_file
+    - debug: var=env_file.stdout_lines
+
+    - name: Ensure community migrations directory is owned by app user
+      file:
+        path: "{{ app_home }}/community/migrations"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        recurse: yes
+
+    - name: Make & apply community migrations in one go  # 수정: 마이그레이션 통합
+      shell: |
+        {{ venv_dir }}/bin/python manage.py makemigrations community
+        {{ venv_dir }}/bin/python manage.py migrate
+      args:
+        chdir: "{{ app_home }}"
+      notify: Reload Apache
+
+    - name: Ensure Django STATICFILES_DIRS source exists
+      file:
+        path: "{{ app_home }}/static"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Collect all static files
+      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
+      args:
+        chdir: "{{ app_home }}"
+      notify: Reload Apache
+
+    - name: Ensure templates directory exists
+      file:
+        path: "{{ app_home }}/templates"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Remove default Apache index.html
       file:
         path: /var/www/html/index.html
         state: absent
-
-
-    - name: Deploy index.html into templates
-      copy:
-        dest: "{{ app_home }}/{{ repo_subdir }}/templates/index.html"
-        content: |
-          <!DOCTYPE html>
-          <html>
-          <head><meta charset="utf-8"><title>On-Premise Web</title></head>
-          <body>
-            <h1>Welcome to On-Premise Web</h1>
-            <nav>
-              <a href="/">Home</a> |
-              <a href="/signup/">Sign Up</a> |
-              <a href="/login/">Login</a>
-            </nav>
-          </body>
-          </html>
-        owner: root
-        group: root
-        mode: '0644'
 
     - name: Patch Django URLconf for root view
       block:
         - name: Ensure TemplateView import
           lineinfile:
-            path: "{{ app_home }}/{{ repo_subdir }}/onprem_project_config/urls.py"
+            path: "{{ app_home }}/onprem_project_config/urls.py"
             insertafter: "^from django.urls import"
             line: "from django.views.generic import TemplateView"
         - name: Replace root pattern with TemplateView
           replace:
-            path: "{{ app_home }}/{{ repo_subdir }}/onprem_project_config/urls.py"
+            path: "{{ app_home }}/onprem_project_config/urls.py"
             regexp: "path\\('',.*\\),"
             replace: "path('', TemplateView.as_view(template_name='index.html'), name='home'),"
       notify: Reload Apache
 
-    - name: Patch wsgi.py to include project root in sys.path   # § WSGI 경로 패치
+    - name: Patch wsgi.py to include project root in sys.path
       blockinfile:
-        path: "{{ app_home }}/{{ repo_subdir }}/onprem_project_config/wsgi.py"
+        path: "{{ app_home }}/onprem_project_config/wsgi.py"
         insertafter: "import os"
         block: |
           import sys
-          # 프로젝트 루트를 Python 경로에 추가
           sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
       notify: Reload Apache
 
@@ -305,59 +370,32 @@
         content: |
           <VirtualHost *:80>
             ServerName localhost
+            ServerAlias 127.0.0.1
 
-            WSGIDaemonProcess onpremweb processes=2 threads=15 python-home={{ venv_dir }}
+            WSGIDaemonProcess onpremweb user=apache group=apache \
+              processes=2 threads=15 \
+              python-home={{ venv_dir }} \
+              python-path={{ app_home }}:{{ venv_dir }}/lib/python3.7/site-packages
             WSGIProcessGroup onpremweb
             WSGIApplicationGroup %{GLOBAL}
-            WSGIScriptAlias / {{ app_home }}/{{ repo_subdir }}/onprem_project_config/wsgi.py
 
-            <Directory {{ app_home }}/{{ repo_subdir }}/onprem_project_config>
+            WSGIScriptAlias / {{ app_home }}/onprem_project_config/wsgi.py
+
+            WSGIPassAuthorization On
+
+
+            <Directory {{ app_home }}/onprem_project_config>
               <Files wsgi.py>
                 Require all granted
               </Files>
             </Directory>
 
-            Alias /static/ {{ app_home }}/{{ repo_subdir }}/staticfiles_collected/
-            <Directory {{ app_home }}/{{ repo_subdir }}/staticfiles_collected>
+            Alias /static/ {{ app_home }}/staticfiles/
+            <Directory {{ app_home }}/staticfiles>
               Require all granted
             </Directory>
           </VirtualHost>
       notify: Reload Apache
-
-    - name: Ensure semanage command available
-      package:
-        name: policycoreutils-python-utils
-        state: present
-
-    - name: Set SELinux file contexts for web content and venv
-      block:
-        - command: semanage fcontext -a -t httpd_sys_content_t '{{ app_home }}(/.*)?'
-        - command: semanage fcontext -a -t httpd_sys_script_exec_t '{{ venv_dir }}(/.*)?'
-        - command: restorecon -Rv '{{ app_home }}'
-        - command: restorecon -Rv '{{ venv_dir }}'
-      ignore_errors: yes
-
-    - name: Set SELinux booleans for Apache
-      block:
-        - seboolean:
-            name: httpd_can_network_connect
-            state: yes
-            persistent: yes
-
-        - seboolean:
-            name: httpd_can_network_connect_db
-            state: yes
-            persistent: yes
-
-        - seboolean:
-            name: httpd_execmem
-            state: yes
-            persistent: yes
-
-        - seboolean:
-            name: httpd_unified
-            state: yes
-            persistent: yes
 
     - name: Ensure Apache ServerName set
       lineinfile:
@@ -365,14 +403,6 @@
         regexp: '^#?ServerName'
         line: 'ServerName localhost'
       notify: Reload Apache
-
-    - name: Ensure venv is owned by apache
-      file:
-        path: "{{ venv_dir }}"
-        owner: apache
-        group: apache
-        recurse: yes
-
 
     - name: Validate Apache config
       command: httpd -t
@@ -385,9 +415,81 @@
         msg: "{{ apache_syntax.stderr_lines }}"
       when: apache_syntax.rc != 0
 
+    # ------------------------
+    # DB 부분
+    # ------------------------
+    - name: Create community DB user
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ community_user }}"
+        password: "{{ community_password }}"
+        state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+        login_unix_socket: ""
+
+    - name: Create community DB
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ community_db }}"
+        owner: "{{ community_user }}"
+        state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+        port: 5432
+
+    #- name: Create posts table
+      #become_user: postgres
+      #community.postgresql.postgresql_query:
+        #login_db: "{{ community_db }}"
+        #login_user: postgres
+        #query: |
+          #CREATE TABLE IF NOT EXISTS posts (
+            #id SERIAL PRIMARY KEY,
+            #title VARCHAR(255) NOT NULL,
+            #content TEXT NOT NULL,
+            #created_at TIMESTAMPTZ DEFAULT NOW()
+          #);
 
     # ------------------------
-    # OpenVPN client 설치/구성
+    # SELinux configuration (조건부)
+    # ------------------------
+    - name: Allow HTTPD network connections in SELinux
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect
+        state: true
+        persistent: yes
+      when: ansible_selinux.status == "enabled"
+
+    - name: Set SELinux file contexts for web content and venv
+      block:
+        - command: semanage fcontext -a -t httpd_sys_content_t '{{ app_home }}(/.*)?'
+        - command: semanage fcontext -a -t httpd_sys_script_exec_t '{{ venv_dir }}(/.*)?'
+        - command: restorecon -Rv '{{ app_home }}'
+        - command: restorecon -Rv '{{ venv_dir }}'
+      ignore_errors: yes
+      when: ansible_selinux.status == "enabled"
+
+    - name: Set SELinux booleans for Apache
+      block:
+        - ansible.posix.seboolean:
+            name: httpd_can_network_connect
+            state: yes
+            persistent: yes
+        - ansible.posix.seboolean:
+            name: httpd_execmem
+            state: yes
+            persistent: yes
+        - ansible.posix.seboolean:
+            name: httpd_unified
+            state: yes
+            persistent: yes
+      when: ansible_selinux.status == "enabled"
+
+    # ------------------------
+    # OpenVPN client 설치/구성 (태그: openvpn)
     # ------------------------
     - block:
         - name: Install OpenVPN client
@@ -426,7 +528,7 @@
           shell: "pkill openvpn || true"
 
         - name: Start OpenVPN client in background
-          shell: >
+          shell: |
             nohup openvpn --config /etc/openvpn/client.conf --daemon \
             2>&1 >/var/log/openvpn-client.log
           args:
@@ -444,14 +546,51 @@
       when: openvpn_enabled
       tags: openvpn
 
-    # 마지막에 Apache 재시작 등 핸들러
+    - name: Ensure manage.py is executable
+      file:
+        path: "{{ app_home }}/manage.py"
+        mode: '0755'
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Normalize manage.py line endings (remove CR)
+      shell: sed -i 's/\r$//' {{ app_home }}/manage.py
+      args:
+        warn: false
+
+    - name: Create Django superuser if not exists
+      community.general.django_manage:
+        command: "createsuperuser --no-input --username {{ django_admin_user }} --email {{ django_admin_email }}"
+        app_path: "{{ app_home }}"
+        virtualenv: "{{ venv_dir }}"
+      environment:
+        DJANGO_SUPERUSER_PASSWORD: "{{ django_admin_password }}"
+      register: admin_user
+      ignore_errors: yes  
+
+    - name: Debug superuser creation
+      debug:
+        msg: "Superuser '{{ django_admin_user }}' creation task ran (check manually if needed)."
+
+    # 마지막에 Apache 재시작
     - name: Start/restart Apache
       service:
         name: httpd
         state: restarted
+        enabled: yes
+
+    - name: Check that mod_wsgi is loaded
+      shell: httpd -M | grep wsgi_module
+      register: wsgi_module
+      failed_when: "'wsgi_module' not in wsgi_module.stdout"
+      changed_when: false        
 
   handlers:
     - name: Reload Apache
       service:
         name: httpd
         state: reloaded
+    #- name: Restart PostgreSQL
+      #service:
+        #name: postgresql
+        #state: restarted  
