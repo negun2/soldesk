@@ -20,6 +20,7 @@ router.register(r'errors', ErrorLogViewSet)
 
 urlpatterns = [
     #path('api/', include(router.urls)),
+    *router.urls,
     path('register/', RegisterView.as_view(), name='register'),
     path('me/', current_user, name='current_user'),  # /api/me/
 ]
