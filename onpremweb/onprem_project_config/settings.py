@@ -28,7 +28,7 @@ raw_hosts = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = raw_hosts.split(',') if raw_hosts else []
 
 print("Loaded ALLOWED_HOSTS:", ALLOWED_HOSTS)
-
+APPEND_SLASH = True
 
 INSTALLED_APPS = [
     'django.contrib.admin',
