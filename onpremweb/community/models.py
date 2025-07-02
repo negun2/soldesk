@@ -26,8 +26,8 @@ class Board(models.Model):
     title = models.CharField(max_length=200)
     cost = models.CharField(max_length=100)
     comment = models.TextField()
-    closer_image_name = models.CharField(max_length=255)
-    entire_image_name = models.CharField(max_length=255)
+    closer_image_name = models.CharField(max_length=255, blank=True, null=True)
+    entire_image_name = models.CharField(max_length=255, blank=True, null=True)
     recommend_count = models.IntegerField(default=0)
     post_date = models.DateTimeField(auto_now_add=True)
 
