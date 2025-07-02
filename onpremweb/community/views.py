@@ -8,6 +8,8 @@ from .permissions import IsAdminOrReadWriteBoard
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
+from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -18,6 +20,15 @@ def current_user(request):
         'username': request.user.username,
         'is_staff': request.user.is_staff,
     })
+
+class BoardImageUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, format=None):
+        file_obj = request.data['file']   # Dragger의 name이 'file'이면!
+        # 저장하고, URL 반환
+        # (적절한 파일시스템 경로/DB저장 등 로직)
+        return Response({'url': 저장된파일URL})
 
 # 게시판(일반/베스트): 전체 사용자 허용 (쓰기 포함), 수정/삭제는 작성자/관리자만
 class BoardViewSet(viewsets.ModelViewSet):
