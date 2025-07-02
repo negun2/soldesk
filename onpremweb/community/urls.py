@@ -22,8 +22,8 @@ router.register(r'errors', ErrorLogViewSet)
 
 urlpatterns = [
     #path('api/', include(router.urls)),
+    path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload')    
     *router.urls,
     path('register/', RegisterView.as_view(), name='register'),
     path('me/', current_user, name='current_user'),  # /api/me/
-    path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload')
 ]
