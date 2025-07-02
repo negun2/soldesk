@@ -6,6 +6,8 @@ from .views import (
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
     RegisterView, current_user
 )
+from .views import BoardImageUploadView
+
 
 router = DefaultRouter()
 router.register(r'analysis', AnalysisViewSet)
@@ -23,4 +25,5 @@ urlpatterns = [
     *router.urls,
     path('register/', RegisterView.as_view(), name='register'),
     path('me/', current_user, name='current_user'),  # /api/me/
+    path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload')
 ]
