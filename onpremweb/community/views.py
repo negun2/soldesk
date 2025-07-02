@@ -46,6 +46,10 @@ class BoardViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+    
+    def retrieve(self, request, *args, **kwargs):
+        print("BoardViewSet.retrieve 호출됨!!")
+        return super().retrieve(request, *args, **kwargs)    
 
 class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Board.objects.order_by('-recommend_count')[:10]   # 추천순 TOP 10
