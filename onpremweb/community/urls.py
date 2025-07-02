@@ -21,9 +21,8 @@ router.register(r'scores', ScoreViewSet)
 router.register(r'errors', ErrorLogViewSet)
 
 urlpatterns = [
-    #path('api/', include(router.urls)),
-    path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload'),    
-    *router.urls,
+    path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload'),
     path('register/', RegisterView.as_view(), name='register'),
-    path('me/', current_user, name='current_user'),  # /api/me/
+    path('me/', current_user, name='current_user'),
+    *router.urls,  # 항상 마지막/콤마
 ]
