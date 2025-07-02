@@ -10,6 +10,9 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.conf import settings
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -25,10 +28,13 @@ class BoardImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, format=None):
-        file_obj = request.data['file']   # Dragger의 name이 'file'이면!
-        # 저장하고, URL 반환
-        # (적절한 파일시스템 경로/DB저장 등 로직)
-        return Response({'url': 저장된파일URL})
+        file_obj = request.data['file']   # 'file'은 Dragger의 name과 같아야 함
+        # 파일 저장 경로 결정
+        folder = 'boardImages/'  # 원하는 서브폴더 지정
+        filename = default_storage.save(folder + file_obj.name, ContentFile(file_obj.read()))
+        file_url = settings.MEDIA_URL + filename   # '/media/boardImages/파일명'
+        # 또는 file_url = request.build_absolute_uri(settings.MEDIA_URL + filename)
+        return Response({'url': file_url, 'filename': filename})
 
 # 게시판(일반/베스트): 전체 사용자 허용 (쓰기 포함), 수정/삭제는 작성자/관리자만
 class BoardViewSet(viewsets.ModelViewSet):
