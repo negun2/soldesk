@@ -42,6 +42,11 @@ class BoardViewSet(viewsets.ModelViewSet):
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
 class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Board.objects.order_by('-recommend_count')[:10]   # 추천순 TOP 10
     serializer_class = BoardSerializer
