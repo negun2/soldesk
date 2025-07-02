@@ -26,10 +26,16 @@ class AnalysisSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class BoardSerializer(serializers.ModelSerializer):
-    author_username = serializers.CharField(source='author.username', read_only=True)
     class Meta:
         model = Board
-        fields = '__all__'   # or 리스트에서 필요한 것만 명시적으로 추가
+        fields = '__all__'
+        read_only_fields = ['author', 'id', 'post_date']  # author를 읽기 전용
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['author'] = request.user
+        return super().create(validated_data)
 
 class RecommendSerializer(serializers.ModelSerializer):
     class Meta:
