@@ -6,6 +6,8 @@ from community.views import current_user
 from rest_framework_simplejwt.views import (
     TokenObtainPairView, TokenRefreshView,
 )
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -22,4 +24,4 @@ urlpatterns = [
 
     # SPA 진입점 (그 외 모든 URL)
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html'), name='spa'),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
