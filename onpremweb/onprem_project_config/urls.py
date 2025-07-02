@@ -18,10 +18,14 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # REST API 엔드포인트
-    path('api/', include('community.urls')),    # <-- 이거 하나면 됨!
-
+    path('api/', include('community.urls')),   # 반드시 SPA 라우팅보다 위에 위치
     path('api-auth/', include('rest_framework.urls')),
+]
 
-    # SPA 진입점 (그 외 모든 URL)
+# 미디어 서빙용(개발서버 한정) 추가
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# SPA 진입점. 반드시 마지막에 위치시켜야 함!
+urlpatterns += [
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html'), name='spa'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
