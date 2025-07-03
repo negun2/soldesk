@@ -15,6 +15,11 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+
+@csrf_exempt
+def test_csrf_view(request):
+    return HttpResponse("csrf_exempt 동작!")
 
 token_obtain_pair = csrf_exempt(TokenObtainPairView.as_view())
 
