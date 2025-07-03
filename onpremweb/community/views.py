@@ -13,6 +13,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
+from rest_framework_simplejwt.views import TokenObtainPairView
+from django.views.decorators.csrf import csrf_exempt
+
+token_obtain_pair = csrf_exempt(TokenObtainPairView.as_view())
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
