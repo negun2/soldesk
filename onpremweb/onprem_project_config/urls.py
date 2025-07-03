@@ -8,13 +8,14 @@ from rest_framework_simplejwt.views import (
 )
 from django.conf import settings
 from django.conf.urls.static import static
+from community.views import token_obtain_pair
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
     # 인증 관련
     path('api/me/', current_user, name='current_user'),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', token_obtain_pair, name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # REST API 엔드포인트
