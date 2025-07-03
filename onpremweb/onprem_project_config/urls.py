@@ -14,13 +14,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # 인증 관련
-    path('me/', current_user, name='current_user'),
-    path('token/', token_obtain_pair, name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('csrf-test/', test_csrf_view),
+    path('api/me/', current_user, name='current_user'),
+    path('api/token/', token_obtain_pair, name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/csrf-test/', test_csrf_view),
 
     # REST API 엔드포인트
-    path('', include('community.urls')),   # 반드시 SPA 라우팅보다 위에 위치
+    path('api/', include('community.urls')),   # 반드시 SPA 라우팅보다 위에 위치
     path('api-auth/', include('rest_framework.urls')),
 ]
 
