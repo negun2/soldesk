@@ -22,7 +22,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 def test_csrf_view(request):
     return HttpResponse("csrf cookie set!")
 
-token_obtain_pair = ensure_csrf_cookie(TokenObtainPairView.as_view()) # csrf_exempt, ensure_csrf_cookie 로 수정함
+token_obtain_pair = ensure_csrf_cookie(TokenObtainPairView.as_view()) # csrf_exempt를 ensure_csrf_cookie 로 수정함
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
