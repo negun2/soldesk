@@ -2,6 +2,8 @@
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import sys
+print("***** DJANGO WSGI LOADED! *****", file=sys.stderr)
 
 # settings.py 파일 위치 기준
 current_file = os.path.abspath(__file__)
@@ -117,3 +119,11 @@ STATICFILES_DIRS = [ BASE_DIR / 'static' ]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+CSRF_COOKIE_HTTPONLY = False  # JS에서 읽을 수 있어야 할 경우 False
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:80',
+    'http://localhost:3000',
+    'http://localhost:80',
+]
+CORS_ALLOW_CREDENTIALS = True
