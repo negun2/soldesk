@@ -56,9 +56,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-
 ROOT_URLCONF = 'onprem_project_config.urls'
 
 TEMPLATES = [
@@ -119,7 +116,13 @@ STATICFILES_DIRS = [ BASE_DIR / 'static' ]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-CSRF_COOKIE_HTTPONLY = False  # JS에서 읽을 수 있어야 할 경우 False
+
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
     'http://127.0.0.1:80',
@@ -127,3 +130,4 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:80',
 ]
 CORS_ALLOW_CREDENTIALS = True
+CSRF_COOKIE_HTTPONLY = False  # JS에서 읽을 수 있어야 할 경우 False
