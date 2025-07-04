@@ -132,4 +132,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:80',
 ]
 CORS_ALLOW_CREDENTIALS = True
-CSRF_COOKIE_HTTPONLY = False  # JS에서 읽을 수 있어야 할 경우 False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = None
