@@ -16,12 +16,13 @@ from django.conf import settings
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
 
-@csrf_exempt
+@ensure_csrf_cookie
 def test_csrf_view(request):
-    return HttpResponse("csrf_exempt 동작!")
+    return HttpResponse("csrf cookie set!")
 
-token_obtain_pair = csrf_exempt(TokenObtainPairView.as_view())
+token_obtain_pair = ensure_csrf_cookie(TokenObtainPairView.as_view()) # csrf_exempt, ensure_csrf_cookie 로 수정함
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
