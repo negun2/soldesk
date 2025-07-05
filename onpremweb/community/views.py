@@ -25,7 +25,7 @@ def test_csrf_view(request):
     resp['Set-Cookie'] = "testcustomcookie=MYTEST; Path=/"
     return resp
 
-token_obtain_pair = ensure_csrf_cookie(TokenObtainPairView.as_view()) # csrf_exempt를 ensure_csrf_cookie 로 수정함
+token_obtain_pair = csrf_exempt(TokenObtainPairView.as_view())
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
