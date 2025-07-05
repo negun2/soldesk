@@ -134,5 +134,6 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_SAMESITE = 'Lax'
-MIDDLEWARE.remove('django.middleware.csrf.CsrfViewMiddleware')
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_DOMAIN = '127.0.0.1'
+#MIDDLEWARE.remove('django.middleware.csrf.CsrfViewMiddleware')
