@@ -2,10 +2,8 @@
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.generic import TemplateView
-from community.views import current_user
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView, TokenRefreshView,
-)
+from community.views import current_user, token_obtain_pair
+from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
 from community.views import ( token_obtain_pair, test_csrf_view )
