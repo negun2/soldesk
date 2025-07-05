@@ -135,3 +135,4 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = 'Lax'
+MIDDLEWARE.remove('django.middleware.csrf.CsrfViewMiddleware')
