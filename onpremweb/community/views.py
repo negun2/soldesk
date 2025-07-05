@@ -18,14 +18,18 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 
+
+@csrf_exempt
+def token_obtain_pair_view(request, *args, **kwargs):
+    view = TokenObtainPairView.as_view()
+    return view(request, *args, **kwargs)
+
 @ensure_csrf_cookie
 def test_csrf_view(request):
     resp = HttpResponse("csrf cookie set!")
     resp.set_cookie("testcookie", "TESTCOOKIE", path="/")
     resp['Set-Cookie'] = "testcustomcookie=MYTEST; Path=/"
     return resp
-
-token_obtain_pair = csrf_exempt(TokenObtainPairView.as_view())
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
