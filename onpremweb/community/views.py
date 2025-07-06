@@ -20,7 +20,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 
 @csrf_exempt
-def token_obtain_pair(request, *args, **kwargs):
+def token_obtain_pair_view(request, *args, **kwargs):
     view = TokenObtainPairView.as_view()
     return view(request, *args, **kwargs)
 
