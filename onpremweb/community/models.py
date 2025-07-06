@@ -24,8 +24,9 @@ class Board(models.Model):
         on_delete=models.CASCADE
     )
     title = models.CharField(max_length=200)
-    cost = models.CharField(max_length=100)
-    comment = models.TextField()
+    content = models.TextField() 
+    cost = models.CharField(max_length=255, blank=True, null=True)  
+    comment = models.TextField(blank=True, null=True)
     closer_image_name = models.CharField(max_length=255, blank=True, null=True)
     entire_image_name = models.CharField(max_length=255, blank=True, null=True)
     recommend_count = models.IntegerField(default=0)
