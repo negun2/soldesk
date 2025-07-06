@@ -26,6 +26,11 @@ class AnalysisSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class BoardSerializer(serializers.ModelSerializer):
+    cost = serializers.CharField(required=False, allow_blank=True)
+    comment = serializers.CharField(required=False, allow_blank=True)
+    closer_image_name = serializers.CharField(required=False, allow_blank=True)
+    entire_image_name = serializers.CharField(required=False, allow_blank=True)  
+      
     class Meta:
         model = Board
         fields = '__all__'
