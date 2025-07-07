@@ -2,11 +2,10 @@
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.generic import TemplateView
-from community.views import current_user, token_obtain_pair
+from community.views import current_user, token_obtain_pair_view, test_csrf_view
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
-from community.views import ( token_obtain_pair_view, test_csrf_view )
 
 urlpatterns = [
     path('api/', include('community.urls')),   # 반드시 SPA 라우팅보다 위에 위치
