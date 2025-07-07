@@ -20,7 +20,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 
 @csrf_exempt
-def token_obtain_pair(request, *args, **kwargs):
+def token_obtain_pair_view(request, *args, **kwargs):
     view = TokenObtainPairView.as_view()
     return view(request, *args, **kwargs)
 
@@ -73,6 +73,11 @@ class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
+class ReplyViewSet(viewsets.ModelViewSet):
+    queryset = Reply.objects.all()
+    serializer_class = ReplySerializer
+    permission_classes = [IsAuthenticated]
+
 # 나머지 게시판: 관리자만
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
@@ -94,13 +99,8 @@ class RecommendViewSet(viewsets.ModelViewSet):
     serializer_class = RecommendSerializer
     permission_classes = [IsAdminUser]
 
-class ReplyViewSet(viewsets.ModelViewSet):
-    queryset = Reply.objects.all()
-    serializer_class = ReplySerializer
-    permission_classes = [IsAdminUser]
-
 class ScoreViewSet(viewsets.ModelViewSet):
-    queryset = Score.objects.all()
+    queryset = Score.objects.all().order_by('created_at')
     serializer_class = ScoreSerializer
     permission_classes = [IsAdminUser]
 
