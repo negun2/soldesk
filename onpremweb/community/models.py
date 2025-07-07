@@ -26,7 +26,6 @@ class Board(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField() 
     cost = models.CharField(max_length=255, blank=True, null=True)  
-    comment = models.TextField(blank=True, null=True)
     closer_image_name = models.CharField(max_length=255, blank=True, null=True)
     entire_image_name = models.CharField(max_length=255, blank=True, null=True)
     recommend_count = models.IntegerField(default=0)
@@ -65,12 +64,10 @@ class Notice(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
 
 class Reply(models.Model):
-    board = models.ForeignKey(
-        Board,
-        related_name='replies',
-        on_delete=models.CASCADE
-    )
+    board = models.ForeignKey(Board, related_name='replies', on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     comment = models.TextField()
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='children', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Score(models.Model):
