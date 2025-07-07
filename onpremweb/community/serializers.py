@@ -25,11 +25,23 @@ class AnalysisSerializer(serializers.ModelSerializer):
         model = Analysis
         fields = '__all__'
 
+class ReplySerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+    author_username = serializers.CharField(source='author.username', read_only=True)
+
+    class Meta:
+        model = Reply
+        fields = ['id', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
+
+    def get_children(self, obj):
+        return ReplySerializer(obj.children.all(), many=True).data
+
 class BoardSerializer(serializers.ModelSerializer):
     cost = serializers.CharField(required=False, allow_blank=True)
-    comment = serializers.CharField(required=False, allow_blank=True)
     closer_image_name = serializers.CharField(required=False, allow_blank=True)
-    entire_image_name = serializers.CharField(required=False, allow_blank=True)  
+    entire_image_name = serializers.CharField(required=False, allow_blank=True) 
+    
+    replies = ReplySerializer(many=True, read_only=True) 
       
     class Meta:
         model = Board
@@ -62,11 +74,6 @@ class NoticeSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = Notice
-        fields = '__all__'
-
-class ReplySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Reply
         fields = '__all__'
 
 class ScoreSerializer(serializers.ModelSerializer):
