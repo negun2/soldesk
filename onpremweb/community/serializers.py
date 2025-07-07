@@ -45,12 +45,17 @@ class BoardSerializer(serializers.ModelSerializer):
     cost = serializers.CharField(required=False, allow_blank=True)
     closer_image_name = serializers.CharField(required=False, allow_blank=True)
     entire_image_name = serializers.CharField(required=False, allow_blank=True) 
-    
-    replies = ReplySerializer(many=True, read_only=True) 
+    replies = ReplySerializer(many=True, read_only=True)
+    author_username = serializers.CharField(source='author.username', read_only=True)
+ 
       
     class Meta:
         model = Board
-        fields = '__all__'
+        fields = [
+            'id', 'author', 'author_username', 'title', 'content', 'cost',
+            'closer_image_name', 'entire_image_name', 'replies', 'recommend_count',
+            'post_date'
+        ]
         read_only_fields = ['author', 'id', 'post_date']  # author를 읽기 전용
 
     def create(self, validated_data):
