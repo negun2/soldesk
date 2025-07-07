@@ -35,6 +35,11 @@ class ReplySerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         return ReplySerializer(obj.children.all(), many=True).data
+    
+    def validate_comment(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("댓글 내용을 입력하세요.")
+        return value    
 
 class BoardSerializer(serializers.ModelSerializer):
     cost = serializers.CharField(required=False, allow_blank=True)
