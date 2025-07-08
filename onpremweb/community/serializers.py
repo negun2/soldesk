@@ -41,10 +41,14 @@ class ReplySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("댓글 내용을 입력하세요.")
         return value    
 
+class BoardImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BoardImage
+        fields = ['id', 'image', 'uploaded_at']
+
 class BoardSerializer(serializers.ModelSerializer):
+    images = BoardImageSerializer(many=True, read_only=True)
     cost = serializers.CharField(required=False, allow_blank=True)
-    closer_image_name = serializers.CharField(required=False, allow_blank=True)
-    entire_image_name = serializers.CharField(required=False, allow_blank=True) 
     replies = ReplySerializer(many=True, read_only=True)
     author_username = serializers.CharField(source='author.username', read_only=True)
  
@@ -53,7 +57,7 @@ class BoardSerializer(serializers.ModelSerializer):
         model = Board
         fields = [
             'id', 'author', 'author_username', 'title', 'content', 'cost',
-            'closer_image_name', 'entire_image_name', 'replies', 'recommend_count',
+            'images', 'replies', 'recommend_count',
             'post_date'
         ]
         read_only_fields = ['author', 'id', 'post_date']  # author를 읽기 전용
