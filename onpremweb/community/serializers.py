@@ -2,7 +2,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
-    Analysis, Board, Recommend, Feedback, BestBoard,
+    Analysis, Board, BoardImage, Recommend, Feedback, BestBoard,
     Notice, Reply, Score, ErrorLog
 )
 
