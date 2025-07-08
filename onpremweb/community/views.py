@@ -43,15 +43,18 @@ def current_user(request):
 
 class BoardImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request, format=None):
-        file_obj = request.data['file']   # 'file'은 Dragger의 name과 같아야 함
-        # 파일 저장 경로 결정
-        folder = 'boardImages/'  # 원하는 서브폴더 지정
-        filename = default_storage.save(folder + file_obj.name, ContentFile(file_obj.read()))
-        file_url = settings.MEDIA_URL + filename   # '/media/boardImages/파일명'
-        # 또는 file_url = request.build_absolute_uri(settings.MEDIA_URL + filename)
-        return Response({'url': file_url, 'filename': filename})
+    def post(self, request, *args, **kwargs):
+        board_id = request.data.get('board_id')
+        board = Board.objects.get(id=board_id)
+        image_files = request.FILES.getlist('images')
+        image_objs = []
+        for img in image_files:
+            img_obj = BoardImage.objects.create(board=board, image=img)
+            image_objs.append(img_obj)
+        serializer = BoardImageSerializer(image_objs, many=True, context={'request': request})
+        return Response(serializer.data)
 
 # 게시판(일반/베스트): 전체 사용자 허용 (쓰기 포함), 수정/삭제는 작성자/관리자만
 class BoardViewSet(viewsets.ModelViewSet):
