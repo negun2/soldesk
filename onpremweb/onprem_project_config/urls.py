@@ -25,6 +25,7 @@ urlpatterns = [
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # SPA 진입점. 반드시 마지막에 위치시켜야 함!
+# 'api/'로 시작하지 않는 모든 요청에만 SPA fallback 적용
 urlpatterns += [
-    re_path(r'^.*$', TemplateView.as_view(template_name='index.html'), name='spa'),
+    re_path(r'^(?!api/).*$', TemplateView.as_view(template_name='index.html'), name='spa'),
 ]
