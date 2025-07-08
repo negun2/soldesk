@@ -80,6 +80,22 @@ class ReplyViewSet(viewsets.ModelViewSet):
     queryset = Reply.objects.all()
     serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+class BoardLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
+        board = Board.objects.get(pk=pk)
+        user = request.user
+        if Recommend.objects.filter(board=board, user=user).exists():
+            return Response({"detail": "이미 좋아요를 눌렀습니다."}, status=400)
+        Recommend.objects.create(board=board, user=user)
+        board.recommend_count = Recommend.objects.filter(board=board).count()
+        board.save(update_fields=['recommend_count'])
+        return Response({"detail": "좋아요!"})
 
 # 나머지 게시판: 관리자만
 class NoticeViewSet(viewsets.ModelViewSet):
