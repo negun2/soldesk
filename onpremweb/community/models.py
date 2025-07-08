@@ -39,10 +39,10 @@ class BoardImage(models.Model):
 
 class Recommend(models.Model):
     board = models.ForeignKey(Board, on_delete=models.CASCADE)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        unique_together = ('board', 'user')  # 유저는 같은 글 좋아요 한 번만!
 
 class Feedback(models.Model):
     user = models.ForeignKey(
