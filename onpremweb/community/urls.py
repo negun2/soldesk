@@ -2,7 +2,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from .views import (
-    AnalysisViewSet, BoardViewSet, RecommendViewSet, FeedbackViewSet,
+    AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet,
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
     RegisterView, current_user
 )
@@ -22,6 +22,7 @@ router.register(r'errors', ErrorLogViewSet)
 
 urlpatterns = [
     path('boards/upload/', BoardImageUploadView.as_view(), name='board-image-upload'),
+    path('boards/<int:pk>/like/', BoardLikeView.as_view(), name='board-like'),    
     path('register/', RegisterView.as_view(), name='register'),
     path('me/', current_user, name='current_user'),
     *router.urls,  # 항상 마지막/콤마
