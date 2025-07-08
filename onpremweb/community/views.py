@@ -1,7 +1,7 @@
 # onpremweb/community/views.py
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from .models import Board, BestBoard, Notice, Feedback, Analysis, Recommend, Reply, Score, ErrorLog
+from .models import Board, BoardImage, BestBoard, Notice, Feedback, Analysis, Recommend, Reply, Score, ErrorLog
 from .serializers import BoardSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, \
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
 from .permissions import IsAdminOrReadWriteBoard
