@@ -2,7 +2,7 @@
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .models import Board, BoardImage, BestBoard, Notice, Feedback, Analysis, Recommend, Reply, Score, ErrorLog
-from .serializers import BoardSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, \
+from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, \
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
 from .permissions import IsAdminOrReadWriteBoard
 from rest_framework.decorators import api_view, permission_classes
