@@ -26,13 +26,16 @@ class Board(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField() 
     cost = models.CharField(max_length=255, blank=True, null=True)  
-    closer_image_name = models.CharField(max_length=255, blank=True, null=True)
-    entire_image_name = models.CharField(max_length=255, blank=True, null=True)
     recommend_count = models.IntegerField(default=0)
     post_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+
+class BoardImage(models.Model):
+    board = models.ForeignKey(Board, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='boardImages/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
 class Recommend(models.Model):
     board = models.ForeignKey(Board, on_delete=models.CASCADE)
