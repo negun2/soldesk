@@ -57,13 +57,14 @@ class BoardSerializer(serializers.ModelSerializer):
     cost = serializers.CharField(required=False, allow_blank=True)
     replies = ReplySerializer(many=True, read_only=True)
     author_username = serializers.CharField(source='author.username', read_only=True)
+    recommended_by_me = serializers.SerializerMethodField()
  
       
     class Meta:
         model = Board
         fields = [
             'id', 'author', 'author_username', 'title', 'content', 'cost',
-            'images', 'replies', 'recommend_count',
+            'images', 'replies', 'recommend_count', 'recommended_by_me',
             'post_date'
         ]
         read_only_fields = ['author', 'id', 'post_date']  # author를 읽기 전용
@@ -73,6 +74,12 @@ class BoardSerializer(serializers.ModelSerializer):
         if request and hasattr(request, 'user'):
             validated_data['author'] = request.user
         return super().create(validated_data)
+
+    def get_recommended_by_me(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Recommend.objects.filter(board=obj, user=request.user).exists()
+        return False
 
 class RecommendSerializer(serializers.ModelSerializer):
     class Meta:
