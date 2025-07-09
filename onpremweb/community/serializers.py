@@ -44,14 +44,9 @@ class ReplySerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        # 1. board를 Board 인스턴스로 변환
-        board_id = validated_data.pop('board')
-        board = Board.objects.get(id=board_id)
-        # 2. author 할당
+        # author 할당
         if request and hasattr(request, 'user'):
             validated_data['author'] = request.user
-        # 3. board도 할당
-        validated_data['board'] = board
         return super().create(validated_data)
 
 class BoardImageSerializer(serializers.ModelSerializer):
