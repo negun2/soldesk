@@ -32,7 +32,7 @@ class ReplySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Reply
-        fields = ['id', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
+        fields = ['id', 'board', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
 
     def get_children(self, obj):
         return ReplySerializer(obj.children.all(), many=True).data
