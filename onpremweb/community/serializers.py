@@ -28,6 +28,7 @@ class AnalysisSerializer(serializers.ModelSerializer):
 class ReplySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
     author_username = serializers.CharField(source='author.username', read_only=True)
+    author = serializers.PrimaryKeyRelatedField(read_only=True) 
 
     class Meta:
         model = Reply
