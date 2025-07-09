@@ -86,9 +86,6 @@ class ReplyViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, pk):
