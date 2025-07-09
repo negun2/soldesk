@@ -80,10 +80,14 @@ class ReplyViewSet(viewsets.ModelViewSet):
     queryset = Reply.objects.all()
     serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
+ 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
