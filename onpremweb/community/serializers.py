@@ -2,7 +2,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
-    Analysis, Board, BoardImage, Recommend, Feedback, FeedbackReply, BestBoard,
+    Analysis, Board, BoardImage, Recommend, Feedback, FeedbackImage, FeedbackReply, BestBoard,
     Notice, Reply, Score, ErrorLog
 )
 
@@ -93,8 +93,14 @@ class RecommendSerializer(serializers.ModelSerializer):
         model = Recommend
         fields = '__all__'
 
+class FeedbackImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeedbackImage
+        fields = ['id', 'image', 'uploaded_at']
+
 class FeedbackSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
+    images = FeedbackImageSerializer(many=True, read_only=True)
     replies = serializers.SerializerMethodField()
 
     class Meta:
