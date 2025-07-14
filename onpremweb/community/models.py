@@ -1,6 +1,7 @@
 # onpremweb/community/models.py
 from django.conf import settings
 from django.db import models
+from django.contrib.auth.models import User
 
 class Analysis(models.Model):
     user = models.ForeignKey(
@@ -45,13 +46,21 @@ class Recommend(models.Model):
         unique_together = ('board', 'user')  # 유저는 같은 글 좋아요 한 번만!
 
 class Feedback(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks')
     title = models.CharField(max_length=200)
-    content = models.TextField()
-    created_date = models.DateTimeField(auto_now_add=True)
+    content = models.TextField()      
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class FeedbackReply(models.Model):
+    feedback = models.ForeignKey(Feedback, on_delete=models.CASCADE, related_name='replies')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_replies')
+    comment = models.TextField()
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='children', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
 
 class BestBoard(models.Model):
     board = models.ForeignKey(Board, on_delete=models.CASCADE)
