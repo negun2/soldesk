@@ -1,6 +1,6 @@
 ---
-# ansible_env_ready_nginx.yml
-# Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA 통합
+# ansible_env_ready.yml
+# Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA + strongSwan(VPN)
 
 - name: Setup PostgreSQL, Django, Nginx, Gunicorn (SPA 통합)
   hosts: localhost
@@ -22,6 +22,9 @@
     django_admin_user: "admin"
     django_admin_email: "admin@example.com"
     django_admin_password: "changeme123"
+    vpn_psk: "SoldeskTestVPN2024!"
+    aws_vpn_public_ip: "52.79.111.222"      # 예시 (AWS측 Public IP)
+    onprem_public_ip: "121.160.41.53"       # 온프레미스 Public IP
 
   tasks:
     # 0. 시스템 패키지, Node.js, PostgreSQL 설치
@@ -351,6 +354,54 @@
         name: nginx
         enabled: yes
         state: started
+
+    # 11. strongSwan(VPN 서버) 설치 및 설정
+    - name: Install strongSwan
+      yum:
+        name: strongswan
+        state: present
+
+    - name: Enable and start strongSwan service
+      systemd:
+        name: strongswan
+        enabled: yes
+        state: started
+
+    - name: Write strongSwan ipsec.conf
+      copy:
+        dest: /etc/strongswan/ipsec.conf
+        content: |
+          config setup
+              charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2,  mgr 2"
+
+          conn aws
+              auto=add
+              left=%any
+              leftid={{ onprem_public_ip }}
+              leftsubnet=192.168.56.0/24    # 온프레미스 내부 네트워크
+              right={{ aws_vpn_public_ip }}
+              rightsubnet=10.10.0.0/16      # AWS 내부 VPC
+              ike=aes256-sha1-modp1024
+              esp=aes256-sha1
+              keyexchange=ikev2
+              type=tunnel
+              authby=psk
+
+    - name: Write strongSwan ipsec.secrets
+      copy:
+        dest: /etc/strongswan/ipsec.secrets
+        content: |
+          {{ onprem_public_ip }} {{ aws_vpn_public_ip }} : PSK "{{ vpn_psk }}"
+
+    - name: Enable strongSwan to start at boot
+      systemd:
+        name: strongswan
+        enabled: yes
+
+    - name: Restart strongSwan
+      systemd:
+        name: strongswan
+        state: restarted
 
   handlers:
     - name: Reload systemd
