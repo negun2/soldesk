@@ -2,8 +2,8 @@
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .permissions import IsAdminOrReadWriteBoard
-from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, Analysis, Recommend, Reply, Score, ErrorLog
-from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, \
+from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
+from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer, \
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -97,6 +97,21 @@ class BoardLikeView(APIView):
         board.recommend_count = Recommend.objects.filter(board=board).count()
         board.save(update_fields=['recommend_count'])
         return Response({"detail": "좋아요!"})
+
+class FeedbackImageUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        feedback_id = request.data.get('feedback_id')
+        feedback = Feedback.objects.get(id=feedback_id)
+        image_files = request.FILES.getlist('images')
+        image_objs = []
+        for img in image_files:
+            img_obj = FeedbackImage.objects.create(feedback=feedback, image=img)
+            image_objs.append(img_obj)
+        serializer = FeedbackImageSerializer(image_objs, many=True, context={'request': request})
+        return Response(serializer.data)
 
 class FeedbackViewSet(viewsets.ModelViewSet):
     queryset = Feedback.objects.all()
