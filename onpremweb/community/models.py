@@ -51,6 +51,11 @@ class Feedback(models.Model):
     content = models.TextField()      
     created_at = models.DateTimeField(auto_now_add=True)
 
+class FeedbackImage(models.Model):
+    feedback = models.ForeignKey(Feedback, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='feedbackImages/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
 class FeedbackReply(models.Model):
     feedback = models.ForeignKey(Feedback, on_delete=models.CASCADE, related_name='replies')
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_replies')
