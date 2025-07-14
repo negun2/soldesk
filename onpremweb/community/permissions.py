@@ -12,3 +12,8 @@ class IsAdminOrReadWriteBoard(BasePermission):
             return request.user and request.user.is_authenticated
         # PUT/PATCH/DELETE만 관리자
         return request.user and request.user.is_staff
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS or request.method == "POST":
+            return request.user and request.user.is_authenticated
+        return request.user and request.user.is_staff
