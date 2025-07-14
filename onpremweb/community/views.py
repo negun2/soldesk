@@ -1,10 +1,10 @@
 # onpremweb/community/views.py
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from .models import Board, BoardImage, BestBoard, Notice, Feedback, Analysis, Recommend, Reply, Score, ErrorLog
-from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, \
-    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
 from .permissions import IsAdminOrReadWriteBoard
+from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, Analysis, Recommend, Reply, Score, ErrorLog
+from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, \
+    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
@@ -98,15 +98,30 @@ class BoardLikeView(APIView):
         board.save(update_fields=['recommend_count'])
         return Response({"detail": "좋아요!"})
 
+class FeedbackViewSet(viewsets.ModelViewSet):
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAdminOrReadWriteBoard]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context  
+
+class FeedbackReplyViewSet(viewsets.ModelViewSet):
+    queryset = FeedbackReply.objects.all()
+    serializer_class = FeedbackReplySerializer
+    permission_classes = [IsAdminOrReadWriteBoard]  # or 필요시 관리자만 (IsAdminUser)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
 # 나머지 게시판: 관리자만
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
-    permission_classes = [IsAdminUser]
-
-class FeedbackViewSet(viewsets.ModelViewSet):
-    queryset = Feedback.objects.all()
-    serializer_class = FeedbackSerializer
     permission_classes = [IsAdminUser]
 
 class AnalysisViewSet(viewsets.ModelViewSet):
