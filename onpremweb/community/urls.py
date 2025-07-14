@@ -2,7 +2,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from .views import (
-    AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet,
+    AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet, FeedbackReplyViewSet,
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
     RegisterView, current_user
 )
@@ -14,6 +14,7 @@ router.register(r'analysis', AnalysisViewSet)
 router.register(r'boards', BoardViewSet)
 router.register(r'recommends', RecommendViewSet)
 router.register(r'feedbacks', FeedbackViewSet)
+router.register(r'feedback-replies', FeedbackReplyViewSet)
 router.register(r'bestboards', BestBoardViewSet, basename='bestboard')
 router.register(r'notices', NoticeViewSet)
 router.register(r'replies', ReplyViewSet)
