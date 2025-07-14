@@ -100,10 +100,17 @@ class FeedbackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Feedback
         fields = '__all__'
+        read_only_fields = ['user']
 
     def get_replies(self, obj):
         root_replies = obj.replies.filter(parent__isnull=True)
         return FeedbackReplySerializer(root_replies, many=True, context=self.context).data
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['user'] = request.user   # ← 로그인 유저를 자동 할당
+        return super().create(validated_data)
 
 
 class FeedbackReplySerializer(serializers.ModelSerializer):
