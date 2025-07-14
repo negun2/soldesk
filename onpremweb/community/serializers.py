@@ -2,7 +2,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
-    Analysis, Board, BoardImage, Recommend, Feedback, BestBoard,
+    Analysis, Board, BoardImage, Recommend, Feedback, FeedbackReply, BestBoard,
     Notice, Reply, Score, ErrorLog
 )
 
@@ -95,9 +95,38 @@ class RecommendSerializer(serializers.ModelSerializer):
 
 class FeedbackSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
+    replies = serializers.SerializerMethodField()
+
     class Meta:
         model = Feedback
         fields = '__all__'
+
+    def get_replies(self, obj):
+        root_replies = obj.replies.filter(parent__isnull=True)
+        return FeedbackReplySerializer(root_replies, many=True, context=self.context).data
+
+
+class FeedbackReplySerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+    author_username = serializers.CharField(source='author.username', read_only=True)
+
+    class Meta:
+        model = FeedbackReply
+        fields = ['id', 'feedback', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
+
+    def get_children(self, obj):
+        return FeedbackReplySerializer(obj.children.all(), many=True).data
+
+    def validate_comment(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("댓글 내용을 입력하세요.")
+        return value
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['author'] = request.user
+        return super().create(validated_data)
 
 class BestBoardSerializer(serializers.ModelSerializer):
     class Meta:
