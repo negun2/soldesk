@@ -57,7 +57,7 @@ class BoardImageSerializer(serializers.ModelSerializer):
 class BoardSerializer(serializers.ModelSerializer):
     images = BoardImageSerializer(many=True, read_only=True)
     cost = serializers.CharField(required=False, allow_blank=True)
-    replies = ReplySerializer(many=True, read_only=True)
+    replies = serializers.SerializerMethodField()
     author_username = serializers.CharField(source='author.username', read_only=True)
     recommended_by_me = serializers.SerializerMethodField()
  
@@ -82,6 +82,11 @@ class BoardSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return Recommend.objects.filter(board=obj, user=request.user).exists()
         return False
+
+    def get_replies(self, obj):
+        # parent가 null인(=최상위) 댓글만!
+        root_replies = obj.replies.filter(parent__isnull=True)
+        return ReplySerializer(root_replies, many=True, context=self.context).data
 
 class RecommendSerializer(serializers.ModelSerializer):
     class Meta:
