@@ -136,9 +136,14 @@ class FeedbackReplySerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        print('==== FEEDBACK REPLY CREATE() CALLED ====')
+        print('validated_data (처음):', validated_data)
         request = self.context.get('request')
+        print('self.context:', self.context)
+        print('request:', request)
         if request and hasattr(request, 'user'):
             validated_data['author'] = request.user
+        print('validated_data (작성자 세팅 후):', validated_data)
         return super().create(validated_data)
 
 class BestBoardSerializer(serializers.ModelSerializer):
