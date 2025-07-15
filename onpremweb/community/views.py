@@ -124,15 +124,6 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context  
 
-    def create(self, request, *args, **kwargs):
-        # 만약 JSON으로 넘어왔으면 DRF가 정상 파싱, 
-        # multipart/form-data면 request.data에서 값 직접 추출
-        title = request.data.get('title')
-        content = request.data.get('content')
-        if not title or not content:
-            return Response({'detail': 'title과 content가 필요합니다.'}, status=400)
-        return super().create(request, *args, **kwargs)
-
 class FeedbackReplyViewSet(viewsets.ModelViewSet):
     queryset = FeedbackReply.objects.all()
     serializer_class = FeedbackReplySerializer
