@@ -19,6 +19,7 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.decorators import action
 from rest_framework import serializers
+from rest_framework import filters
 
 
 @csrf_exempt
@@ -60,6 +61,11 @@ class BoardViewSet(viewsets.ModelViewSet):
     queryset = Board.objects.all()
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'post_date', 'recommend_count']  # 허용되는 필드
+    ordering = ['-post_date']  # 기본값: 최신순
+    search_fields = ['title', 'content', 'author__username']
+
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
