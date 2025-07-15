@@ -1,6 +1,7 @@
 # onpremweb/community/views.py
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework import serializers
 from .permissions import IsAdminOrReadWriteBoard
 from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
 from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer, \
@@ -139,6 +140,18 @@ class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
     permission_classes = [IsAdminUser]
+
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])  # 관리자만
+def user_list(request):
+    users = User.objects.all()
+    serializer = UserSimpleSerializer(users, many=True)
+    return Response(serializer.data)
 
 class AnalysisViewSet(viewsets.ModelViewSet):
     queryset = Analysis.objects.all()
