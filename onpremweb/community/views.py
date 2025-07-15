@@ -1,11 +1,11 @@
 # onpremweb/community/views.py
-from rest_framework import viewsets, generics
+from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework import serializers
 from .permissions import IsAdminOrReadWriteBoard
 from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
 from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer, \
-    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer
+    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
@@ -152,6 +152,19 @@ def user_list(request):
     users = User.objects.all()
     serializer = UserSimpleSerializer(users, many=True)
     return Response(serializer.data)
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSimpleSerializer
+    permission_classes = [IsAdminUser]  # 관리자가 회원 관리만 가능
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        # 관리자 혹은 본인 계정 삭제 방지
+        if user.is_staff or user == request.user:
+            return Response({'detail': '관리자 또는 본인은 삭제할 수 없습니다.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
 
 class AnalysisViewSet(viewsets.ModelViewSet):
     queryset = Analysis.objects.all()
