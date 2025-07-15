@@ -6,8 +6,9 @@ from .views import (
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
     RegisterView, current_user, user_list, UserViewSet
 )
-from .views import BoardImageUploadView
-
+from .views import (
+    BoardImageUploadView, UserViewSet,
+)
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
