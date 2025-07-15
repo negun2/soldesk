@@ -1,11 +1,10 @@
 # onpremweb/community/views.py
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework import serializers
 from .permissions import IsAdminOrReadWriteBoard
 from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
 from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer, \
-    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer
+    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
@@ -153,6 +152,12 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSimpleSerializer
     permission_classes = [IsAdminUser]  # 관리자가 회원 관리만 가능
 
+    def get_serializer_class(self):
+        # /api/users/<id>/일 때는 상세, /api/users/는 목록(간단정보)
+        if self.action == 'retrieve':
+            return UserDetailSerializer
+        return UserSimpleSerializer
+
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
         # 관리자 혹은 본인 계정 삭제 방지
@@ -160,6 +165,13 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'detail': '관리자 또는 본인은 삭제할 수 없습니다.'},
                             status=status.HTTP_400_BAD_REQUEST)
         return super().destroy(request, *args, **kwargs)
+
+from rest_framework.decorators import api_view, permission_classes
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    serializer = UserDetailSerializer(request.user)
+    return Response(serializer.data)
 
 class AnalysisViewSet(viewsets.ModelViewSet):
     queryset = Analysis.objects.all()
