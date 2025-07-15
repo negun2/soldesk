@@ -20,6 +20,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'is_staff']
+
 class AnalysisSerializer(serializers.ModelSerializer):
     class Meta:
         model = Analysis
