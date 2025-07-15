@@ -17,6 +17,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework.decorators import action
+from rest_framework import serializers
 
 
 @csrf_exempt
@@ -131,18 +133,9 @@ class FeedbackReplyViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
-# 나머지 게시판: 관리자만
-class NoticeViewSet(viewsets.ModelViewSet):
-    queryset = Notice.objects.all()
-    serializer_class = NoticeSerializer
-    permission_classes = [IsAdminUser]
-
-@api_view(['GET'])
-@permission_classes([IsAdminUser])  # 관리자만
-def user_list(request):
-    users = User.objects.all()
-    serializer = UserSimpleSerializer(users, many=True)
-    return Response(serializer.data)
+class SetPasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -163,11 +156,35 @@ class UserViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=['post'], url_path='set_password')
+    def set_password(self, request, pk=None):
+        user = self.get_object()
+        serializer = SetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not user.check_password(serializer.validated_data['old_password']):
+            return Response({'detail': '현재 비밀번호가 올바르지 않습니다.'}, status=400)
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        return Response({'detail': '비밀번호가 변경되었습니다.'})
+
 from rest_framework.decorators import api_view, permission_classes
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def current_user(request):
     serializer = UserDetailSerializer(request.user)
+    return Response(serializer.data)
+
+# 나머지 게시판: 관리자만
+class NoticeViewSet(viewsets.ModelViewSet):
+    queryset = Notice.objects.all()
+    serializer_class = NoticeSerializer
+    permission_classes = [IsAdminUser]
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])  # 관리자만
+def user_list(request):
+    users = User.objects.all()
+    serializer = UserSimpleSerializer(users, many=True)
     return Response(serializer.data)
 
 class AnalysisViewSet(viewsets.ModelViewSet):
