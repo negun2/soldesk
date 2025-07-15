@@ -1,11 +1,13 @@
 # onpremweb/community/views.py
-from rest_framework import viewsets, generics, status
+from rest_framework import viewsets, generics, status, filters
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .permissions import IsAdminOrReadWriteBoard
 from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
-from .serializers import BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer, \
+from .serializers import (
+    BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer,
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer
-from rest_framework.decorators import api_view, permission_classes
+)
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
@@ -17,9 +19,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework.decorators import action
 from rest_framework import serializers
-from rest_framework import filters
 
 
 @csrf_exempt
@@ -81,6 +81,12 @@ class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
+    # 정렬/검색 옵션 추가
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'post_date', 'recommend_count', 'title', 'author__username']
+    ordering = ['-recommend_count']  # 추천순 기본
+    search_fields = ['title', 'content', 'author__username']
+
 class ReplyViewSet(viewsets.ModelViewSet):
     queryset = Reply.objects.all()
     serializer_class = ReplySerializer
@@ -123,6 +129,12 @@ class FeedbackViewSet(viewsets.ModelViewSet):
     serializer_class = FeedbackSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    # 정렬/검색 옵션 추가
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'created_at', 'title', 'user__username']
+    ordering = ['-created_at']  # 기본: 최신순
+    search_fields = ['title', 'content', 'user__username']
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -185,6 +197,12 @@ class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
     permission_classes = [IsAdminUser]
+
+    # 정렬/검색 옵션 추가
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'created_at', 'title', 'user__username']
+    ordering = ['-created_at']
+    search_fields = ['title', 'content', 'user__username']
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])  # 관리자만
