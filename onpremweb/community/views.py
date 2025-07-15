@@ -35,11 +35,8 @@ def test_csrf_view(request):
 @permission_classes([IsAuthenticated])
 def current_user(request):
     """ GET /api/me/ → 유저 정보 """
-    return Response({
-        'id': request.user.id,
-        'username': request.user.username,
-        'is_staff': request.user.is_staff,
-    })
+    serializer = UserDetailSerializer(request.user)
+    return Response(serializer.data)
 
 class BoardImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
