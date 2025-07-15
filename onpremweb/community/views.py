@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
@@ -117,11 +117,21 @@ class FeedbackViewSet(viewsets.ModelViewSet):
     queryset = Feedback.objects.all()
     serializer_class = FeedbackSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context  
+
+    def create(self, request, *args, **kwargs):
+        # 만약 JSON으로 넘어왔으면 DRF가 정상 파싱, 
+        # multipart/form-data면 request.data에서 값 직접 추출
+        title = request.data.get('title')
+        content = request.data.get('content')
+        if not title or not content:
+            return Response({'detail': 'title과 content가 필요합니다.'}, status=400)
+        return super().create(request, *args, **kwargs)
 
 class FeedbackReplyViewSet(viewsets.ModelViewSet):
     queryset = FeedbackReply.objects.all()
