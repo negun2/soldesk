@@ -141,11 +141,6 @@ class NoticeViewSet(viewsets.ModelViewSet):
     serializer_class = NoticeSerializer
     permission_classes = [IsAdminUser]
 
-class UserSimpleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username']
-
 @api_view(['GET'])
 @permission_classes([IsAdminUser])  # 관리자만
 def user_list(request):
