@@ -25,6 +25,11 @@ class UserSimpleSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'is_staff']
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'is_staff', 'date_joined', 'last_login']
+
 class AnalysisSerializer(serializers.ModelSerializer):
     class Meta:
         model = Analysis
