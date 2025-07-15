@@ -77,9 +77,13 @@ class BoardViewSet(viewsets.ModelViewSet):
         return super().retrieve(request, *args, **kwargs)    
 
 class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Board.objects.order_by('-recommend_count')[:10]   # 추천순 TOP 10
+    queryset = Board.objects.all()  # 슬라이싱 제거!
     serializer_class = BoardSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'post_date', 'recommend_count', 'title', 'author__username']
+    ordering = ['-recommend_count']  # 기본 정렬: 추천순
+    search_fields = ['title', 'content', 'author__username']
 
     # 정렬/검색 옵션 추가
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
