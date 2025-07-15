@@ -4,12 +4,13 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet, FeedbackImageUploadView, FeedbackReplyViewSet,
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
-    RegisterView, current_user, user_list
+    RegisterView, current_user, user_list, UserViewSet
 )
 from .views import BoardImageUploadView
 
 
 router = DefaultRouter()
+router.register(r'users', UserViewSet)
 router.register(r'analysis', AnalysisViewSet)
 router.register(r'boards', BoardViewSet)
 router.register(r'recommends', RecommendViewSet)
