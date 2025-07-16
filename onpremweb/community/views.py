@@ -46,6 +46,7 @@ def current_user(request):
     return Response(serializer.data)
 
 class NotificationViewSet(viewsets.ModelViewSet):
+    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
