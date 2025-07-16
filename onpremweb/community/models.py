@@ -9,8 +9,8 @@ class Notification(models.Model):
         (NOTIFY_COMMENT, '댓글'),
     ]
     to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    board = models.ForeignKey(Board, on_delete=models.CASCADE)
-    reply = models.ForeignKey(Reply, on_delete=models.CASCADE, null=True, blank=True)
+    board = models.ForeignKey('Board', on_delete=models.CASCADE)
+    reply = models.ForeignKey('Reply', on_delete=models.CASCADE, null=True, blank=True)
     notif_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     message = models.CharField(max_length=255)
     is_read = models.BooleanField(default=False)
