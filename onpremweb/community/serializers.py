@@ -3,8 +3,17 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
     Analysis, Board, BoardImage, Recommend, Feedback, FeedbackImage, FeedbackReply, BestBoard,
-    Notice, Reply, Score, ErrorLog
+    Notice, Reply, Score, ErrorLog, Notification
 )
+
+class NotificationSerializer(serializers.ModelSerializer):
+    board_title = serializers.CharField(source='board.title', read_only=True)
+    reply_comment = serializers.CharField(source='reply.comment', read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'notif_type', 'message', 'is_read', 'created_at', 'board', 'board_title', 'reply', 'reply_comment']
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
