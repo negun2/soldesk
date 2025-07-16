@@ -101,6 +101,20 @@ class ReplyViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def perform_create(self, serializer):
+        reply = serializer.save(author=self.request.user)
+        board = reply.board
+        # 자기 댓글이 아니고, 본인이 쓴 글이 아니면 알림
+        if board.author != self.request.user:
+            from .models import Notification
+            Notification.objects.create(
+                to_user=board.author,
+                board=board,
+                reply=reply,
+                notif_type='comment',
+                message=f"{self.request.user.username}님이 회원님의 게시글에 댓글을 남겼습니다."
+            )
+
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, pk):
