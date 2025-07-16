@@ -2,10 +2,14 @@
 from rest_framework import viewsets, generics, status, filters
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .permissions import IsAdminOrReadWriteBoard
-from .models import Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, Score, ErrorLog
+from .models import ( 
+    Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, 
+    Score, ErrorLog, Notification
+)
 from .serializers import (
     BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer,
-    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer
+    AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer,
+    NotificationSerializer
 )
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -40,6 +44,21 @@ def current_user(request):
     """ GET /api/me/ → 유저 정보 """
     serializer = UserDetailSerializer(request.user)
     return Response(serializer.data)
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 내 알림만
+        return Notification.objects.filter(to_user=self.request.user).order_by('-created_at')
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = True
+        notif.save()
+        return Response({'status': '읽음'})
 
 class BoardImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
