@@ -8,4 +8,4 @@ python-dotenv
 django-extensions
 gunicorn>=21.2.0
 Pillow
-react-toastify
+#react-toastify
