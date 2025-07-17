@@ -4,12 +4,12 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, BasePermiss
 from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
 from .models import ( 
     Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, 
-    Score, ErrorLog, Notification, NoticeReply
+    Score, ErrorLog, Notification, NoticeReply, NoticeImage
 )
 from .serializers import (
     BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer,
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer,
-    NotificationSerializer, NoticeReplySerializer
+    NotificationSerializer, NoticeReplySerializer, NoticeImageSerializer
 )
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -236,6 +236,20 @@ def current_user(request):
     return Response(serializer.data)
 
 # 나머지 게시판: 관리자만
+class NoticeImageUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        notice_id = request.data.get('notice_id')
+        notice = Notice.objects.get(pk=notice_id)
+        images = request.FILES.getlist('images')
+        image_objs = []
+        for img in images:
+            image_obj = NoticeImage.objects.create(notice=notice, image=img)
+            image_objs.append(image_obj)
+        serializer = NoticeImageSerializer(image_objs, many=True)
+        return Response(serializer.data)
+
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
