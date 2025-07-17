@@ -4,12 +4,12 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .permissions import IsAdminOrReadWriteBoard
 from .models import ( 
     Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, 
-    Score, ErrorLog, Notification
+    Score, ErrorLog, Notification, NoticeReply
 )
 from .serializers import (
     BoardSerializer, BoardImageSerializer, BestBoardSerializer, NoticeSerializer, FeedbackSerializer, FeedbackReplySerializer, FeedbackImageSerializer,
     AnalysisSerializer, RecommendSerializer, ReplySerializer, ScoreSerializer, ErrorLogSerializer, RegisterSerializer, UserSimpleSerializer, UserDetailSerializer,
-    NotificationSerializer
+    NotificationSerializer, NoticeReplySerializer
 )
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -241,6 +241,20 @@ class NoticeViewSet(viewsets.ModelViewSet):
     ordering_fields = ['id', 'created_at', 'title', 'user__username']
     ordering = ['-created_at']
     search_fields = ['title', 'content', 'user__username']
+
+class NoticeReplyViewSet(viewsets.ModelViewSet):
+    queryset = NoticeReply.objects.all()
+    serializer_class = NoticeReplySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])  # 관리자만
