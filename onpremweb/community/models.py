@@ -91,7 +91,7 @@ class Notice(models.Model):
     )
     title = models.CharField(max_length=200)
     content = models.TextField()
-    created_date = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class Reply(models.Model):
     board = models.ForeignKey(Board, related_name='replies', on_delete=models.CASCADE)
