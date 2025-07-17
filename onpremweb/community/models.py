@@ -93,6 +93,11 @@ class Notice(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+class NoticeImage(models.Model):
+    notice = models.ForeignKey(Notice, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='noticeImages/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
 class NoticeReply(models.Model):
     notice = models.ForeignKey('Notice', related_name='replies', on_delete=models.CASCADE)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
