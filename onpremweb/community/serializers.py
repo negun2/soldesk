@@ -162,6 +162,7 @@ class BestBoardSerializer(serializers.ModelSerializer):
 
 class NoticeSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
+    replies = serializers.SerializerMethodField()
     class Meta:
         model = Notice
         fields = '__all__'
