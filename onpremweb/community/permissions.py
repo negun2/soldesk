@@ -17,3 +17,13 @@ class IsAdminOrReadWriteBoard(BasePermission):
         if request.method in SAFE_METHODS or request.method == "POST":
             return request.user and request.user.is_authenticated
         return request.user and request.user.is_staff
+
+class IsAdminOrReadOnly(BasePermission):
+    """
+    읽기(GET/HEAD/OPTIONS)는 모두,
+    나머지(POST/PUT/PATCH/DELETE)는 관리자만
+    """
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True  # 누구나 읽기 허용
+        return request.user and request.user.is_staff    
