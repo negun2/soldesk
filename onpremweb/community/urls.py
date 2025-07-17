@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet, FeedbackImageUploadView, FeedbackReplyViewSet,
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
-    RegisterView, current_user, user_list, UserViewSet, NotificationViewSet
+    RegisterView, current_user, user_list, UserViewSet, NotificationViewSet, NoticeReplyViewSet
 )
 from .views import (
     BoardImageUploadView, UserViewSet,
@@ -20,6 +20,7 @@ router.register(r'feedbacks', FeedbackViewSet)
 router.register(r'feedback-replies', FeedbackReplyViewSet)
 router.register(r'bestboards', BestBoardViewSet, basename='bestboard')
 router.register(r'notices', NoticeViewSet)
+router.register(r'notice-replies', NoticeReplyViewSet)
 router.register(r'replies', ReplyViewSet)
 router.register(r'scores', ScoreViewSet)
 router.register(r'errors', ErrorLogViewSet)
