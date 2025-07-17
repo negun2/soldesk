@@ -24,6 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import serializers
+from rest_framework.permissions import BasePermission
 
 
 @csrf_exempt
@@ -193,10 +194,14 @@ class SetPasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
     new_password = serializers.CharField()
 
+class IsAdminOrSelf(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return request.user.is_staff or obj == request.user
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSimpleSerializer
-    permission_classes = [IsAdminUser]  # 관리자가 회원 관리만 가능
+    permission_classes = [IsAdminOrSelf]  # 관리자가 회원 관리만 가능
 
     def get_serializer_class(self):
         # /api/users/<id>/일 때는 상세, /api/users/는 목록(간단정보)
@@ -206,11 +211,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
-        # 관리자 혹은 본인 계정 삭제 방지
-        if user.is_staff or user == request.user:
-            return Response({'detail': '관리자 또는 본인은 삭제할 수 없습니다.'},
+        # 관리자만 삭제 불가 (본인 삭제는 허용)
+        if user.is_staff:
+            return Response({'detail': '관리자는 삭제할 수 없습니다.'},
                             status=status.HTTP_400_BAD_REQUEST)
         return super().destroy(request, *args, **kwargs)
+
 
     @action(detail=True, methods=['post'], url_path='set_password')
     def set_password(self, request, pk=None):
