@@ -1,7 +1,7 @@
 # onpremweb/community/views.py
 from rest_framework import viewsets, generics, status, filters
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from .permissions import IsAdminOrReadWriteBoard
+from rest_framework.permissions import IsAdminUser, IsAuthenticated, BasePermission
+from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
 from .models import ( 
     Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis, Recommend, Reply, 
     Score, ErrorLog, Notification, NoticeReply
@@ -24,7 +24,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import serializers
-from rest_framework.permissions import BasePermission
 
 
 @csrf_exempt
@@ -240,7 +239,7 @@ def current_user(request):
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrReadOnly]
 
     # 정렬/검색 옵션 추가
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
