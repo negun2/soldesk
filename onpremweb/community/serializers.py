@@ -47,14 +47,12 @@ class AnalysisSerializer(serializers.ModelSerializer):
 class ReplySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
     author_username = serializers.CharField(source='author.username', read_only=True)
-    author = serializers.PrimaryKeyRelatedField(read_only=True) 
-
+    author = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Reply
         fields = ['id', 'board', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
-
     def get_children(self, obj):
-        return ReplySerializer(obj.children.all(), many=True).data
+        return ReplySerializer(obj.children.all(), many=True, context=self.context).data
     
     def validate_comment(self, value):
         if not value.strip():
@@ -148,7 +146,7 @@ class FeedbackReplySerializer(serializers.ModelSerializer):
         fields = ['id', 'feedback', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
 
     def get_children(self, obj):
-        return FeedbackReplySerializer(obj.children.all(), many=True).data
+        return FeedbackReplySerializer(obj.children.all(), many=True, context=self.context).data
 
     def validate_comment(self, value):
         if not value.strip():
