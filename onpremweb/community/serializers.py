@@ -185,6 +185,7 @@ class NoticeReplySerializer(serializers.ModelSerializer):
     class Meta:
         model = NoticeReply
         fields = ['id', 'notice', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
+        read_only_fields = ['author']
 
     def get_children(self, obj):
         return NoticeReplySerializer(obj.children.all(), many=True).data
