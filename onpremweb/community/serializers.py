@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
     Analysis, Board, BoardImage, Recommend, Feedback, FeedbackImage, FeedbackReply, BestBoard,
-    Notice, Reply, Score, ErrorLog, Notification
+    Notice, Reply, Score, ErrorLog, Notification, NoticeReply
 )
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -165,6 +165,34 @@ class NoticeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notice
         fields = '__all__'
+
+    def get_replies(self, obj):
+        root_replies = obj.replies.filter(parent__isnull=True)
+        return NoticeReplySerializer(root_replies, many=True, context=self.context).data
+
+
+class NoticeReplySerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+    author_username = serializers.CharField(source='author.username', read_only=True)
+
+    class Meta:
+        model = NoticeReply
+        fields = ['id', 'notice', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
+
+    def get_children(self, obj):
+        return NoticeReplySerializer(obj.children.all(), many=True).data
+
+    def validate_comment(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("댓글 내용을 입력하세요.")
+        return value
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['author'] = request.user
+        return super().create(validated_data)
+
 
 class ScoreSerializer(serializers.ModelSerializer):
     class Meta:
