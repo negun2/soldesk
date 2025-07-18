@@ -40,7 +40,7 @@
     - name: Install base system packages
       yum:
         name:
-          - epel-release
+          #- epel-release
           - python3
           - python3-pip
           - python3-devel
@@ -365,3 +365,5 @@
       systemd:
         name: nginx
         state: reloaded
+
+        
