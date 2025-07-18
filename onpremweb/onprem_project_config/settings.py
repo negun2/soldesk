@@ -125,6 +125,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
+    "http://hidcars.com",
+    "http://hidcars.com:80",
     "http://3.34.193.224:80",
     "http://172.18.2.219:80",
 ]
@@ -134,6 +136,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
+    "http://hidcars.com",
+    "http://hidcars.com:80",    
     "http://3.34.193.224:80",
     "http://172.18.2.219:80",
 ]
