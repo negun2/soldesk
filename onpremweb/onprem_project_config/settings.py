@@ -126,6 +126,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:80",
     "http://3.34.193.224:80",
+    "http://172.18.2.219:80",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -134,6 +135,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:80",
     "http://3.34.193.224:80",
+    "http://172.18.2.219:80",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False
