@@ -1,4 +1,4 @@
-# onpremweb/community/models.py
+# onpremweb_aws/community/models.py
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
@@ -50,21 +50,6 @@ class BoardImage(models.Model):
     board = models.ForeignKey(Board, related_name='images', on_delete=models.CASCADE)
     image = models.CharField(max_length=512)  # presigned URL 저장용
     uploaded_at = models.DateTimeField(auto_now_add=True)
-
-class BoardImageUploadView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwargs):
-        board_id = request.data.get('board_id')
-        board = Board.objects.get(id=board_id)
-        s3_urls = request.data.getlist('s3_urls[]')
-        image_objs = []
-        for url in s3_urls:
-            img_obj = BoardImage.objects.create(board=board, image=url)
-            image_objs.append(img_obj)
-        serializer = BoardImageSerializer(image_objs, many=True, context={'request': request})
-        return Response(serializer.data)
-
 
 class Recommend(models.Model):
     board = models.ForeignKey(Board, on_delete=models.CASCADE)
