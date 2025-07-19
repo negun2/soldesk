@@ -1,5 +1,5 @@
 ---
-# ansible_env_ready_aws.yml
+# ansible_env_ready_aws_tokyo.yml
 # Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA 통합
 
 - name: Setup PostgreSQL, Django, Nginx, Gunicorn (SPA 통합), .env with S3
@@ -166,22 +166,22 @@
         version: "{{ repo_version }}"
         force: yes
 
-    - name: Stat onpremweb_aws directory
+    - name: Stat onpremweb_aws_tokyo directory
       stat:
-        path: /tmp/soldesk/onpremweb_aws
-      register: ansible_stat_onpremweb_aws
+        path: /tmp/soldesk/onpremweb_aws_tokyo
+      register: ansible_stat_onpremweb_aws_tokyo
 
     - name: Remove existing onpremweb dir if exists
       file:
         path: /tmp/soldesk/onpremweb
         state: absent
 
-    - name: Rename onpremweb_aws to onpremweb (if exists)
-      command: mv /tmp/soldesk/onpremweb_aws /tmp/soldesk/onpremweb
+    - name: Rename onpremweb_aws_tokyo to onpremweb (if exists)
+      command: mv /tmp/soldesk/onpremweb_aws_tokyo /tmp/soldesk/onpremweb
       args:
-        removes: /tmp/soldesk/onpremweb_aws
+        removes: /tmp/soldesk/onpremweb_aws_tokyo
         creates: /tmp/soldesk/onpremweb
-      when: ansible_stat_onpremweb_aws.stat.exists
+      when: ansible_stat_onpremweb_aws_tokyo.stat.exists
 
     - name: Sync only onpremweb to app_home
       synchronize:
@@ -243,11 +243,12 @@
         requirements: "{{ app_home }}/requirements.txt"
 
     # 6. .env 및 SECRET_KEY 자동 생성
-    - name: Copy .env example
+    - name: Copy .env.example to .env (if .env does not exist)
       copy:
         src: "{{ app_home }}/.env.example"
         dest: "{{ app_home }}/.env"
         remote_src: yes
+      ignore_errors: yes
 
     - name: Check if SECRET_KEY exists in .env
       shell: grep -q '^SECRET_KEY=' {{ app_home }}/.env
