@@ -242,7 +242,7 @@
         virtualenv: "{{ venv_dir }}"
         requirements: "{{ app_home }}/requirements.txt"
 
-    # 6. .env 및 SECRET_KEY 자동 생성 (기존 예시)
+    # 6. .env 및 SECRET_KEY 자동 생성
     - name: Copy .env example
       copy:
         src: "{{ app_home }}/.env.example"
@@ -254,7 +254,7 @@
       register: secret_key_check
       ignore_errors: true
 
-    # *** [추가] S3에서 실제 .env 덮어쓰기 ***
+    # S3에서 실제 .env 덮어쓰기
     - name: Download .env from S3 (항상 최신 secrets로 덮어쓰기)
       shell: |
         aws s3 cp s3://{{ s3_env_bucket }}/{{ s3_env_key }} {{ app_home }}/.env
