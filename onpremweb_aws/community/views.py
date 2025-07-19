@@ -91,7 +91,7 @@ def s3_presigned_upload(request):
     url = s3.generate_presigned_url(
         ClientMethod='put_object',
         Params={
-            'Bucket': 'hidcars-image',
+            'Bucket': 'hidcars-image-2',
             'Key': s3_key,
             'ContentType': file_type,
             'ACL': 'public-read',   # public 업로드일 때
@@ -99,7 +99,7 @@ def s3_presigned_upload(request):
         ExpiresIn=300,
         HttpMethod='PUT'
     )
-    return Response({'url': url, 's3_url': f"https://hidcars-image.s3.ap-northeast-1.amazonaws.com/{s3_key}"})
+    return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-1.amazonaws.com/{s3_key}"})
 
 @csrf_exempt
 def token_obtain_pair_view(request, *args, **kwargs):
