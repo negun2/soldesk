@@ -99,7 +99,7 @@ def s3_presigned_upload(request):
         ExpiresIn=300,
         HttpMethod='PUT'
     )
-    return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-1.amazonaws.com/{s3_key}"})
+    return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-2.amazonaws.com/{s3_key}"})
 
 @csrf_exempt
 def token_obtain_pair_view(request, *args, **kwargs):
