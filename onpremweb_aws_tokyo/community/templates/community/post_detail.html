@@ -1,0 +1,9 @@
+<!-- onpremweb/community/templates/community/post_detail.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ post.title }}</h1>
+  <p>{{ post.content }}</p>
+  <a href="{% url 'community:post_update' post.pk %}">Edit</a> |
+  <a href="{% url 'community:post_delete' post.pk %}">Delete</a> |
+  <a href="{% url 'community:post_list' %}">Back to list</a>
+{% endblock %}
