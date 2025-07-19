@@ -243,11 +243,12 @@
         requirements: "{{ app_home }}/requirements.txt"
 
     # 6. .env 및 SECRET_KEY 자동 생성
-    - name: Copy .env
+    - name: Copy .env.example to .env (if .env does not exist)
       copy:
-        src: "{{ app_home }}/.env"
+        src: "{{ app_home }}/.env.example"
         dest: "{{ app_home }}/.env"
         remote_src: yes
+      ignore_errors: yes
 
     - name: Check if SECRET_KEY exists in .env
       shell: grep -q '^SECRET_KEY=' {{ app_home }}/.env
