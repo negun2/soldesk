@@ -243,9 +243,9 @@
         requirements: "{{ app_home }}/requirements.txt"
 
     # 6. .env 및 SECRET_KEY 자동 생성
-    - name: Copy .env example
+    - name: Copy .env
       copy:
-        src: "{{ app_home }}/.env.example"
+        src: "{{ app_home }}/.env"
         dest: "{{ app_home }}/.env"
         remote_src: yes
 
