@@ -1,0 +1,405 @@
+---
+# ansible_env_ready_aws.yml
+# Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA 통합
+
+- name: Setup PostgreSQL, Django, Nginx, Gunicorn (SPA 통합), .env with S3
+  hosts: localhost
+  become: yes
+  gather_facts: yes
+
+  vars:
+    db_host: "localhost"
+    ansible_python_interpreter: /usr/bin/python3
+    app_user: "nginx"           # 또는 "ec2-user" (centos는 "nginx" 권장)
+    app_home: "/var/www/onpremweb"
+    repo_url: "https://github.com/negun2/soldesk.git"
+    repo_version: "main"
+    venv_dir: "{{ app_home }}/venv"
+    postgres_user: "django"
+    postgres_password: "changeme123"
+    postgres_super_password: "p@ssw0rd"
+    postgres_db: "onpremwebdb"
+    django_admin_user: "admin"
+    django_admin_email: "admin@example.com"
+    django_admin_password: "changeme123"
+    s3_env_bucket: "hidcars-secrets"
+    s3_env_key: "prod/.env.tokyo"
+
+
+  tasks:
+    # 0. 시스템 패키지, Node.js, PostgreSQL 설치
+    - name: Enable EPEL
+      shell: amazon-linux-extras enable epel -y
+      args: { creates: /etc/yum.repos.d/epel.repo }
+
+    - name: Enable PostgreSQL 10
+      shell: amazon-linux-extras enable postgresql10 -y
+      args: { creates: /etc/yum.repos.d/amzn2-extras-postgresql10.repo }
+
+    - name: Enable nginx1 on Amazon Linux 2
+      shell: amazon-linux-extras enable nginx1 -y
+      args: { creates: /etc/yum.repos.d/amzn2-extras-nginx1.repo }
+
+    - name: Install base system packages
+      yum:
+        name:
+          #- epel-release
+          - python3
+          - python3-pip
+          - python3-devel
+          - gcc
+          - git
+          - wget
+          - curl
+          - readline-devel
+          - zlib-devel
+          - libffi-devel
+          - openssl-devel
+          - postgresql
+          - postgresql-server
+          - postgresql-contrib
+          - postgresql-devel
+          - rsync
+          - nginx
+        state: present
+        update_cache: yes
+
+    - name: Remove Apache if installed (optional)
+      yum:
+        name: httpd
+        state: absent
+      ignore_errors: yes
+
+    - name: Install Node.js 16 for frontend build
+      shell: |
+        curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
+        yum install -y nodejs
+      args: { executable: /bin/bash }
+      become: yes
+
+    # 1. 프로젝트 디렉터리/venv 및 소스 준비
+    - name: Ensure app_home exists
+      file:
+        path: "{{ app_home }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+    - name: Create Python virtualenv
+      command: python3 -m venv {{ venv_dir }}
+      args: { creates: "{{ venv_dir }}/bin/activate" }
+
+    # 2. Gunicorn 설치
+    - name: Install Gunicorn in venv
+      pip:
+        name: gunicorn
+        virtualenv: "{{ venv_dir }}"
+
+    # 3. PostgreSQL DB 준비 (유저/DB/퍼미션)
+    - name: Initialize PostgreSQL database
+      command: /usr/bin/postgresql-setup --initdb
+      args: { creates: /var/lib/pgsql/data/PG_VERSION }
+    - name: Start and enable PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Configure PostgreSQL listen_addresses
+      lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        regexp: '^#?listen_addresses'
+        line: "listen_addresses = '*'"
+
+    - name: Configure pg_hba.conf (local/TCP 모두)
+      lineinfile:
+        path: /var/lib/pgsql/data/pg_hba.conf
+        create: yes
+        insertafter: '^# "local" is for Unix domain socket connections only'
+        line: "{{ item }}"
+      loop:
+        - "local   all             all                                     peer"
+        - "host    all             all             127.0.0.1/32            md5"
+        - "host    all             all             0.0.0.0/0               md5"
+
+    - name: Reload PostgreSQL to apply pg_hba changes
+      service: { name: postgresql, state: restarted }
+
+    - name: Ensure psycopg2-binary installed for system python3
+      pip: { name: psycopg2-binary, executable: pip3 }
+
+    - name: Set password for postgres superuser
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: "{{ postgres_super_password }}"
+        state: present
+        login_unix_socket: /var/run/postgresql
+
+    - name: Create main project PostgreSQL user
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ postgres_user }}"
+        password: "{{ postgres_password }}"
+        role_attr_flags: "LOGIN,CREATEDB"
+        state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+
+    - name: Create main project PostgreSQL DB
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ postgres_db }}"
+        owner: "{{ postgres_user }}"
+        state: present
+        login_user: postgres
+        login_password: "{{ postgres_super_password }}"
+        login_host: 127.0.0.1
+        port: 5432
+
+    # 4. 소스코드 및 정적/SPA 파일 배포
+    - name: Clone project repo to temp
+      git:
+        repo: "{{ repo_url }}"
+        dest: "/tmp/soldesk"
+        version: "{{ repo_version }}"
+        force: yes
+
+    - name: Stat onpremweb_aws directory
+      stat:
+        path: /tmp/soldesk/onpremweb_aws
+      register: ansible_stat_onpremweb_aws
+
+    - name: Remove existing onpremweb dir if exists
+      file:
+        path: /tmp/soldesk/onpremweb
+        state: absent
+
+    - name: Rename onpremweb_aws to onpremweb (if exists)
+      command: mv /tmp/soldesk/onpremweb_aws /tmp/soldesk/onpremweb
+      args:
+        removes: /tmp/soldesk/onpremweb_aws
+        creates: /tmp/soldesk/onpremweb
+      when: ansible_stat_onpremweb_aws.stat.exists
+
+    - name: Sync only onpremweb to app_home
+      synchronize:
+        src: "/tmp/soldesk/onpremweb/"
+        dest: "{{ app_home }}/"
+        rsync_opts: ["--omit-dir-times", "--no-perms"]
+        mode: push
+
+    - name: Ensure manage.py is executable
+      file:
+        path: "{{ app_home }}/manage.py"
+        mode: "0755"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Ensure template/static/media dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+      loop:
+        - "{{ app_home }}/templates"
+        - "{{ app_home }}/staticfiles"
+        - "{{ app_home }}/media"
+        - "{{ app_home }}/static"
+
+    - name: Deploy frontend index.html (SPA 루트)
+      copy:
+        src: "/tmp/soldesk/frontend_build/index.html"
+        dest: "{{ app_home }}/templates/index.html"
+        remote_src: yes
+
+    - name: Deploy frontend static files
+      synchronize:
+        src: "/tmp/soldesk/frontend_build/static/"
+        dest: "{{ app_home }}/staticfiles/"
+        archive: yes
+        rsync_opts: ["--omit-dir-times", "--no-perms"]
+        mode: push
+
+    - name: Fix ownership for app directory
+      file:
+        path: "{{ app_home }}"
+        recurse: yes
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Remove temp repo
+      file:
+        path: /tmp/soldesk
+        state: absent
+
+    # 5. requirements.txt Django 등 설치
+    - name: Install Python requirements into venv
+      pip:
+        virtualenv: "{{ venv_dir }}"
+        requirements: "{{ app_home }}/requirements.txt"
+
+    # 6. .env 및 SECRET_KEY 자동 생성
+    - name: Copy .env example
+      copy:
+        src: "{{ app_home }}/.env.example"
+        dest: "{{ app_home }}/.env"
+        remote_src: yes
+
+    - name: Check if SECRET_KEY exists in .env
+      shell: grep -q '^SECRET_KEY=' {{ app_home }}/.env
+      register: secret_key_check
+      ignore_errors: true
+
+    # S3에서 실제 .env 덮어쓰기
+    - name: Download .env from S3 (항상 최신 secrets로 덮어쓰기)
+      shell: |
+        aws s3 cp s3://{{ s3_env_bucket }}/{{ s3_env_key }} {{ app_home }}/.env
+        chown {{ app_user }}:{{ app_user }} {{ app_home }}/.env
+        chmod 600 {{ app_home }}/.env
+
+    - name: Generate SECRET_KEY if missing
+      lineinfile:
+        path: "{{ app_home }}/.env"
+        line: "SECRET_KEY={{ lookup('password', '/etc/ansible/secret.key length=50 chars=ascii_letters') }}"
+        insertafter: '^DEBUG='
+      when: secret_key_check.rc != 0
+
+    # 7. Django 초기화: migrate/staticfiles/슈퍼유저
+    - name: Make & apply community migrations
+      shell: |
+        {{ venv_dir }}/bin/python manage.py makemigrations community
+        {{ venv_dir }}/bin/python manage.py migrate
+      args: { chdir: "{{ app_home }}" }
+      notify: Restart Gunicorn
+
+    - name: Collect all static files
+      command: "{{ venv_dir }}/bin/python manage.py collectstatic --noinput"
+      args: { chdir: "{{ app_home }}" }
+      notify: Restart Gunicorn
+
+    - name: Create Django superuser (존재하면 무시)
+      command: "{{ venv_dir }}/bin/python manage.py createsuperuser --no-input --username {{ django_admin_user }} --email {{ django_admin_email }}"
+      args:
+        chdir: "{{ app_home }}"
+      environment:
+        DJANGO_SUPERUSER_PASSWORD: "{{ django_admin_password }}"
+      ignore_errors: yes
+
+    # 8. Gunicorn systemd 서비스 배포
+    - name: Create Gunicorn systemd service
+      copy:
+        dest: /etc/systemd/system/gunicorn-onpremweb.service
+        content: |
+          [Unit]
+          Description=gunicorn daemon for onpremweb
+          After=network.target
+
+          [Service]
+          User={{ app_user }}
+          Group={{ app_user }}
+          WorkingDirectory={{ app_home }}
+          ExecStart={{ venv_dir }}/bin/gunicorn \
+            --access-logfile - \
+            --workers 3 \
+            --bind unix:{{ app_home }}/onpremweb.sock \
+            onprem_project_config.wsgi:application
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart Gunicorn
+
+    # 9. nginx vhost 설정 (SPA + API 프록시)
+    - name: Deploy nginx vhost
+      copy:
+        dest: /etc/nginx/conf.d/onpremweb.conf
+        content: |
+          server {
+              listen 80;
+              server_name 127.0.0.1 localhost;
+
+              charset     utf-8;
+              client_max_body_size 20M;
+
+              # SPA/정적
+              root {{ app_home }}/templates;
+              index index.html;
+
+              location /static/ {
+                  alias {{ app_home }}/staticfiles/;
+              }
+              location /media/ {
+                  alias {{ app_home }}/media/;
+              }
+
+              # Django API (프록시)
+              location /api/ {
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+
+                  proxy_pass http://unix:{{ app_home }}/onpremweb.sock;
+              }
+
+              # SPA fallback
+              location / {
+                  try_files $uri /index.html;
+              }
+          }
+
+    - name: Remove default nginx index.html
+      file:  
+        path: /usr/share/nginx/html/index.html
+        state: absent
+
+    - name: Fix ownership for app directory (final)
+      file:
+        path: "{{ app_home }}"
+        recurse: yes
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    # S3 CLI sync 예시 (추가)
+    - name: Sync SPA build to S3
+      shell: aws s3 sync {{ app_home }}/frontend_build/ s3://hidcars-seoul-web/
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+        AWS_DEFAULT_REGION: "ap-northeast-2"
+      when: inventory_hostname == 'seoul-asg'
+
+    # 10. 서비스 실행/재시작
+    - name: Ensure Gunicorn started
+      systemd:
+        name: gunicorn-onpremweb
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Ensure nginx started
+      systemd:
+        name: nginx
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Restart Gunicorn
+      systemd:
+        name: gunicorn-onpremweb
+        state: restarted
+
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+        
