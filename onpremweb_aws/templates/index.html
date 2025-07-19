@@ -1,0 +1,37 @@
+<!-- onpremweb/templates/index.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome | On-Premise Web</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <style>
+    .nav-buttons {
+      margin-top: 2em;
+    }
+    .nav-buttons a {
+      display: inline-block;
+      margin: 0 .5em;
+      padding: .75em 1.5em;
+      background: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .nav-buttons a:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to On-Premise Web</h1>
+  <p>서버가 정상적으로 동작 중입니다.</p>
+
+  <div class="nav-buttons">
+    <a href="{% url 'community:post_list' %}">커뮤니티</a>
+    <a href="{% url 'login' %}">로그인</a>
+    <a href="{% url 'signup' %}">회원가입</a>
+  </div>
+</body>
+</html>
