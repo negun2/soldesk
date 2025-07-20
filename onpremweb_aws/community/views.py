@@ -1,4 +1,4 @@
-# onpremweb/community/views.py
+# onpremweb_aws/community/views.py
 from rest_framework import viewsets, generics, status, filters
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, BasePermission
 from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
@@ -86,7 +86,7 @@ def s3_presigned_upload(request):
         's3',
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name='ap-northeast-1'  # 도쿄 이미지 버킷
+        region_name='ap-northeast-2'  # 서울 이미지 버킷
     )
     url = s3.generate_presigned_url(
         ClientMethod='put_object',
@@ -101,6 +101,13 @@ def s3_presigned_upload(request):
     )
     return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-2.amazonaws.com/{s3_key}"})
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    """ GET /api/me/ → 유저 정보 """
+    serializer = UserDetailSerializer(request.user)
+    return Response(serializer.data)
+
 @csrf_exempt
 def token_obtain_pair_view(request, *args, **kwargs):
     view = TokenObtainPairView.as_view()
@@ -112,13 +119,6 @@ def test_csrf_view(request):
     resp.set_cookie("testcookie", "TESTCOOKIE", path="/")
     resp['Set-Cookie'] = "testcustomcookie=MYTEST; Path=/"
     return resp
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def current_user(request):
-    """ GET /api/me/ → 유저 정보 """
-    serializer = UserDetailSerializer(request.user)
-    return Response(serializer.data)
 
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
