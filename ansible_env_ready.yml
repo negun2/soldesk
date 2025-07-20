@@ -1,8 +1,8 @@
 ---
-# ansible_env_ready_aws.yml
-# Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA 통합
+# ansible_env_ready.yml
+# Amazon Linux 2 + PostgreSQL + Django + Nginx + Gunicorn + SPA + strongSwan(VPN)
 
-- name: Setup PostgreSQL, Django, Nginx, Gunicorn (SPA 통합), .env with S3
+- name: Setup PostgreSQL, Django, Nginx, Gunicorn (SPA 통합)
   hosts: localhost
   become: yes
   gather_facts: yes
@@ -22,9 +22,9 @@
     django_admin_user: "admin"
     django_admin_email: "admin@example.com"
     django_admin_password: "changeme123"
-    s3_env_bucket: "hidcars-secrets"
-    s3_env_key: "prod/.env"
-
+    vpn_psk: "SoldeskTestVPN2024!"
+    aws_vpn_public_ip: "52.79.111.222"      # 예시 (AWS측 Public IP)
+    onprem_public_ip: "121.160.41.53"       # 온프레미스 Public IP
 
   tasks:
     # 0. 시스템 패키지, Node.js, PostgreSQL 설치
@@ -43,7 +43,7 @@
     - name: Install base system packages
       yum:
         name:
-          #- epel-release
+          - epel-release
           - python3
           - python3-pip
           - python3-devel
@@ -166,23 +166,6 @@
         version: "{{ repo_version }}"
         force: yes
 
-    - name: Stat onpremweb_aws directory
-      stat:
-        path: /tmp/soldesk/onpremweb_aws
-      register: ansible_stat_onpremweb_aws
-
-    - name: Remove existing onpremweb dir if exists
-      file:
-        path: /tmp/soldesk/onpremweb
-        state: absent
-
-    - name: Rename onpremweb_aws to onpremweb (if exists)
-      command: mv /tmp/soldesk/onpremweb_aws /tmp/soldesk/onpremweb
-      args:
-        removes: /tmp/soldesk/onpremweb_aws
-        creates: /tmp/soldesk/onpremweb
-      when: ansible_stat_onpremweb_aws.stat.exists
-
     - name: Sync only onpremweb to app_home
       synchronize:
         src: "/tmp/soldesk/onpremweb/"
@@ -243,25 +226,17 @@
         requirements: "{{ app_home }}/requirements.txt"
 
     # 6. .env 및 SECRET_KEY 자동 생성
-    - name: Copy .env.example to .env (if .env does not exist)
+    - name: Copy .env example
       copy:
         src: "{{ app_home }}/.env.example"
         dest: "{{ app_home }}/.env"
         remote_src: yes
-      ignore_errors: yes
 
     - name: Check if SECRET_KEY exists in .env
       shell: grep -q '^SECRET_KEY=' {{ app_home }}/.env
       register: secret_key_check
       ignore_errors: true
-
-    # S3에서 실제 .env 덮어쓰기
-    - name: Download .env from S3 (항상 최신 secrets로 덮어쓰기)
-      shell: |
-        aws s3 cp s3://{{ s3_env_bucket }}/{{ s3_env_key }} {{ app_home }}/.env
-        chown {{ app_user }}:{{ app_user }} {{ app_home }}/.env
-        chmod 600 {{ app_home }}/.env
-
+      
     - name: Generate SECRET_KEY if missing
       lineinfile:
         path: "{{ app_home }}/.env"
@@ -322,7 +297,7 @@
         content: |
           server {
               listen 80;
-              server_name server_name hidcars.com www.hidcars.com 127.0.0.1 localhost;
+              server_name 127.0.0.1 localhost;
 
               charset     utf-8;
               client_max_body_size 20M;
@@ -366,15 +341,6 @@
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
 
-    # S3 CLI sync 예시 (추가)
-    - name: Sync SPA build to S3
-      shell: aws s3 sync {{ app_home }}/frontend_build/ s3://hidcars-seoul-web/
-      environment:
-        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
-        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
-        AWS_DEFAULT_REGION: "ap-northeast-2"
-      when: inventory_hostname == 'seoul-asg'
-
     # 10. 서비스 실행/재시작
     - name: Ensure Gunicorn started
       systemd:
@@ -389,6 +355,54 @@
         enabled: yes
         state: started
 
+    # 11. strongSwan(VPN 서버) 설치 및 설정
+    - name: Install strongSwan
+      yum:
+        name: strongswan
+        state: present
+
+    - name: Enable and start strongSwan service
+      systemd:
+        name: strongswan
+        enabled: yes
+        state: started
+
+    - name: Write strongSwan ipsec.conf
+      copy:
+        dest: /etc/strongswan/ipsec.conf
+        content: |
+          config setup
+              charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2,  mgr 2"
+
+          conn aws
+              auto=add
+              left=%any
+              leftid={{ onprem_public_ip }}
+              leftsubnet=172.16.56.0/24    # 온프레미스 내부 네트워크
+              right={{ aws_vpn_public_ip }}
+              rightsubnet=10.10.0.0/16      # AWS 내부 VPC
+              ike=aes256-sha1-modp1024
+              esp=aes256-sha1
+              keyexchange=ikev2
+              type=tunnel
+              authby=psk
+
+    - name: Write strongSwan ipsec.secrets
+      copy:
+        dest: /etc/strongswan/ipsec.secrets
+        content: |
+          {{ onprem_public_ip }} {{ aws_vpn_public_ip }} : PSK "{{ vpn_psk }}"
+
+    - name: Enable strongSwan to start at boot
+      systemd:
+        name: strongswan
+        enabled: yes
+
+    - name: Restart strongSwan
+      systemd:
+        name: strongswan
+        state: restarted
+
   handlers:
     - name: Reload systemd
       command: systemctl daemon-reload
@@ -402,5 +416,3 @@
       systemd:
         name: nginx
         state: reloaded
-
-        
