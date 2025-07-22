@@ -24,7 +24,40 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import serializers
+import boto3
+import uuid
 
+
+@api_view(['GET'])
+def check_username(request):
+    username = request.GET.get('username', '')
+    exists = User.objects.filter(username=username).exists()
+    return Response({'exists': exists})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def s3_presigned_upload(request):
+    file_name = request.data['file_name']  # 예: car1.jpg
+    file_type = request.data['file_type']  # 예: image/jpeg
+    s3_key = f"user_uploads/{request.user.id}/{uuid.uuid4()}_{file_name}"
+    s3 = boto3.client(
+        's3',
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name='ap-northeast-1'  # 도쿄 이미지 버킷
+    )
+    url = s3.generate_presigned_url(
+        ClientMethod='put_object',
+        Params={
+            'Bucket': 'hidcars-image-2',
+            'Key': s3_key,
+            'ContentType': file_type,
+            'ACL': 'public-read',   # public 업로드일 때
+        },
+        ExpiresIn=300,
+        HttpMethod='PUT'
+    )
+    return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-2.amazonaws.com/{s3_key}"})
 
 @csrf_exempt
 def token_obtain_pair_view(request, *args, **kwargs):
