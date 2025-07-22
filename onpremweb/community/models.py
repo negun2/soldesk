@@ -12,13 +12,13 @@ class Notification(models.Model):
         (NOTIFY_FEEDBACK_REPLY, '피드백댓글'),
         (NOTIFY_NOTICE_REPLY, '공지댓글'),
     ]
-    to_user = models.ForeignKey(User, ...)
-    board = models.ForeignKey('Board', ..., null=True, blank=True)
-    reply = models.ForeignKey('Reply', ..., null=True, blank=True)
-    feedback = models.ForeignKey('Feedback', ..., null=True, blank=True)
-    feedback_reply = models.ForeignKey('FeedbackReply', ..., null=True, blank=True)
-    notice = models.ForeignKey('Notice', ..., null=True, blank=True)
-    notice_reply = models.ForeignKey('NoticeReply', ..., null=True, blank=True)
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE)
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, null=True, blank=True)
+    reply = models.ForeignKey('Reply', on_delete=models.CASCADE, null=True, blank=True)
+    feedback = models.ForeignKey('Feedback', on_delete=models.CASCADE, null=True, blank=True)
+    feedback_reply = models.ForeignKey('FeedbackReply', on_delete=models.CASCADE, null=True, blank=True)
+    notice = models.ForeignKey('Notice', on_delete=models.CASCADE, null=True, blank=True)
+    notice_reply = models.ForeignKey('NoticeReply', on_delete=models.CASCADE, null=True, blank=True)
     notif_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     message = models.CharField(max_length=255)
     is_read = models.BooleanField(default=False)
