@@ -34,6 +34,12 @@ def check_username(request):
     exists = User.objects.filter(username=username).exists()
     return Response({'exists': exists})
 
+@api_view(['GET'])
+def check_email(request):
+    email = request.GET.get('email', '')
+    exists = User.objects.filter(email=email).exists()
+    return Response({'exists': exists})
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def s3_presigned_upload(request):
