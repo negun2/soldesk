@@ -6,6 +6,7 @@ from .views import (
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, BoardImageUploadView, UserViewSet, 
     RegisterView, current_user, user_list, UserViewSet, NotificationViewSet, NoticeReplyViewSet, NoticeImageUploadView
 )
+from . import views
 # from .views_presigned import s3_presigned_upload
 
 router = DefaultRouter()
