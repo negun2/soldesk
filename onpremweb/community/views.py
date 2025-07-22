@@ -222,6 +222,19 @@ class FeedbackReplyViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def perform_create(self, serializer):
+        reply = serializer.save(author=self.request.user)
+        feedback = reply.feedback
+        if feedback.user != self.request.user:
+            from .models import Notification
+            Notification.objects.create(
+                to_user=feedback.user,
+                feedback=feedback,
+                feedback_reply=reply,
+                notif_type='feedback_reply',
+                message=f"{self.request.user.username}님이 회원님의 피드백에 댓글을 남겼습니다."
+            )
+
 class SetPasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
     new_password = serializers.CharField()
@@ -306,6 +319,20 @@ class NoticeReplyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def perform_create(self, serializer):
+        reply = serializer.save(author=self.request.user)
+        notice = reply.notice
+        if notice.user != self.request.user:
+            from .models import Notification
+            Notification.objects.create(
+                to_user=notice.user,
+                notice=notice,
+                notice_reply=reply,
+                notif_type='notice_reply',
+                message=f"{self.request.user.username}님이 회원님의 공지사항에 댓글을 남겼습니다."
+            )
+
 
 
 @api_view(['GET'])
