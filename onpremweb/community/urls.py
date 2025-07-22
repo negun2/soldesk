@@ -31,7 +31,8 @@ urlpatterns = [
     path('notices/upload/', NoticeImageUploadView.as_view(), name='notice-image-upload'),    
     path('register/', RegisterView.as_view(), name='register'),
     path('users/list/', user_list, name='user-list'),
-    path('user/check-username/', views.check_username, name='check-username'),    
+    path('user/check-username/', views.check_username, name='check-username'),
+    path('user/check-email/', views.check_email),    
     path('me/', current_user, name='current_user'),
     *router.urls,  # 항상 마지막/콤마
 ]
