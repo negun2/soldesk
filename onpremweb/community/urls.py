@@ -3,12 +3,10 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from .views import (
     AnalysisViewSet, BoardViewSet, RecommendViewSet, BoardLikeView, FeedbackViewSet, FeedbackImageUploadView, FeedbackReplyViewSet,
-    BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, 
+    BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, BoardImageUploadView, UserViewSet, 
     RegisterView, current_user, user_list, UserViewSet, NotificationViewSet, NoticeReplyViewSet, NoticeImageUploadView
 )
-from .views import (
-    BoardImageUploadView, UserViewSet,
-)
+from .views_presigned import s3_presigned_upload
 
 router = DefaultRouter()
 router.register(r'notifications', NotificationViewSet)
@@ -31,7 +29,8 @@ urlpatterns = [
     path('feedbacks/upload/', FeedbackImageUploadView.as_view(), name='feedback-image-upload'),
     path('notices/upload/', NoticeImageUploadView.as_view(), name='notice-image-upload'),    
     path('register/', RegisterView.as_view(), name='register'),
-    path('users/list/', user_list, name='user-list'),    
+    path('users/list/', user_list, name='user-list'),
+    path('user/check-username/', views.check_username, name='check-username'),    
     path('me/', current_user, name='current_user'),
     *router.urls,  # 항상 마지막/콤마
 ]
