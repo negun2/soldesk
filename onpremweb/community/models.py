@@ -5,12 +5,20 @@ from django.contrib.auth.models import User
 
 class Notification(models.Model):
     NOTIFY_COMMENT = 'comment'
+    NOTIFY_FEEDBACK_REPLY = 'feedback_reply'
+    NOTIFY_NOTICE_REPLY = 'notice_reply'
     TYPE_CHOICES = [
         (NOTIFY_COMMENT, '댓글'),
+        (NOTIFY_FEEDBACK_REPLY, '피드백댓글'),
+        (NOTIFY_NOTICE_REPLY, '공지댓글'),
     ]
-    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    board = models.ForeignKey('Board', on_delete=models.CASCADE)
-    reply = models.ForeignKey('Reply', on_delete=models.CASCADE, null=True, blank=True)
+    to_user = models.ForeignKey(User, ...)
+    board = models.ForeignKey('Board', ..., null=True, blank=True)
+    reply = models.ForeignKey('Reply', ..., null=True, blank=True)
+    feedback = models.ForeignKey('Feedback', ..., null=True, blank=True)
+    feedback_reply = models.ForeignKey('FeedbackReply', ..., null=True, blank=True)
+    notice = models.ForeignKey('Notice', ..., null=True, blank=True)
+    notice_reply = models.ForeignKey('NoticeReply', ..., null=True, blank=True)
     notif_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     message = models.CharField(max_length=255)
     is_read = models.BooleanField(default=False)
@@ -128,3 +136,4 @@ class ErrorLog(models.Model):
     code = models.CharField(max_length=100)
     message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    
