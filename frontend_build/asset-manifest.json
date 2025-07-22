@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "./static/css/main.99840573.css",
-    "main.js": "./static/js/main.3273f8ae.js",
+    "main.css": "./static/css/main.e6c13ad2.css",
+    "main.js": "./static/js/main.a478e4ba.js",
     "static/js/453.721f835e.chunk.js": "./static/js/453.721f835e.chunk.js",
     "static/media/app-debug.apk": "./static/media/app-debug.16193f13b670d1effd8d.apk",
     "static/media/ararar.jpg": "./static/media/ararar.f5039183f57b3b2eabd8.jpg",
@@ -15,14 +15,13 @@
     "static/media/kkk.jpg": "./static/media/kkk.5d7499592aa29d75e00f.jpg",
     "static/media/MainLogo.png": "./static/media/MainLogo.9d5675a7cb199f1049b7.png",
     "static/media/homeNews.jpg": "./static/media/homeNews.7ab382ac06e169585dc3.jpg",
-    "static/media/logout.png": "./static/media/logout.413d122b29e282c57f59.png",
     "index.html": "./index.html",
-    "main.99840573.css.map": "./static/css/main.99840573.css.map",
-    "main.3273f8ae.js.map": "./static/js/main.3273f8ae.js.map",
+    "main.e6c13ad2.css.map": "./static/css/main.e6c13ad2.css.map",
+    "main.a478e4ba.js.map": "./static/js/main.a478e4ba.js.map",
     "453.721f835e.chunk.js.map": "./static/js/453.721f835e.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.99840573.css",
-    "static/js/main.3273f8ae.js"
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.a478e4ba.js"
   ]
 }
