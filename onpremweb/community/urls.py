@@ -6,7 +6,7 @@ from .views import (
     BestBoardViewSet, NoticeViewSet, ReplyViewSet, ScoreViewSet, ErrorLogViewSet, BoardImageUploadView, UserViewSet, 
     RegisterView, current_user, user_list, UserViewSet, NotificationViewSet, NoticeReplyViewSet, NoticeImageUploadView
 )
-from .views_presigned import s3_presigned_upload
+# from .views_presigned import s3_presigned_upload
 
 router = DefaultRouter()
 router.register(r'notifications', NotificationViewSet)
