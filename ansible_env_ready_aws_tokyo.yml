@@ -322,7 +322,7 @@
         content: |
           server {
               listen 80;
-              server_name hidcars.com www.hidcars.com 127.0.0.1 localhost;
+              server_name hidcars.com www.hidcars.com api.hidcars.com 127.0.0.1 localhost;
 
               charset     utf-8;
               client_max_body_size 20M;
@@ -345,6 +345,12 @@
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
 
+                  # CORS/CSRF 헤더 직접 추가 (API 경로만!)
+                  add_header 'Access-Control-Allow-Origin' 'https://www.hidcars.com' always;
+                  add_header 'Access-Control-Allow-Credentials' 'true' always;
+                  add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,X-CSRFToken' always;
+                  add_header 'Access-Control-Allow-Methods' 'GET,POST,PUT,PATCH,DELETE,OPTIONS' always;
+
                   proxy_pass http://unix:{{ app_home }}/onpremweb.sock;
               }
 
@@ -353,6 +359,7 @@
                   try_files $uri /index.html;
               }
           }
+
 
     - name: Remove default nginx index.html
       file:  
