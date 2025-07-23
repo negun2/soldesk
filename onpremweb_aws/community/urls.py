@@ -7,23 +7,8 @@ from .views import (
     RegisterView, current_user, user_list, UserViewSet, NotificationViewSet, NoticeReplyViewSet, NoticeImageUploadView
 )
 from . import views
-from django.utils import timezone
 from .views_presigned import s3_presigned_upload
-from django.contrib.auth.models import User
 
-class CustomTokenObtainPairView(TokenObtainPairView):
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == 200:
-            # username으로 유저 찾아서 last_login 갱신
-            username = request.data.get("username")
-            try:
-                user = User.objects.get(username=username)
-                user.last_login = timezone.now()
-                user.save(update_fields=['last_login'])
-            except User.DoesNotExist:
-                pass
-        return response
 
 router = DefaultRouter()
 router.register(r'notifications', NotificationViewSet)
