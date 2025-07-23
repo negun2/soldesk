@@ -9,6 +9,7 @@ from .views import (
 from . import views
 from django.utils import timezone
 from .views_presigned import s3_presigned_upload
+from django.contrib.auth.models import User
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
