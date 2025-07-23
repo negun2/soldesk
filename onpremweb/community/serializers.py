@@ -53,7 +53,10 @@ class ReplySerializer(serializers.ModelSerializer):
         model = Reply
         fields = ['id', 'board', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
     def get_children(self, obj):
-        return ReplySerializer(obj.children.all(), many=True, context=self.context).data
+        return ReplySerializer(
+            obj.children.filter(board=obj.board),
+            many=True, context=self.context
+        ).data
     
     def validate_comment(self, value):
         if not value.strip():
@@ -147,8 +150,12 @@ class FeedbackReplySerializer(serializers.ModelSerializer):
         fields = ['id', 'feedback', 'author', 'author_username', 'comment', 'parent', 'created_at', 'children']
 
     def get_children(self, obj):
-        return FeedbackReplySerializer(obj.children.all(), many=True, context=self.context).data
-
+        # 현재 feedback과 같은 feedback의 children만 반환
+        return FeedbackReplySerializer(
+            obj.children.filter(feedback=obj.feedback),
+            many=True, context=self.context
+        ).data
+        
     def validate_comment(self, value):
         if not value.strip():
             raise serializers.ValidationError("댓글 내용을 입력하세요.")
@@ -194,7 +201,10 @@ class NoticeReplySerializer(serializers.ModelSerializer):
         read_only_fields = ['author']
 
     def get_children(self, obj):
-        return NoticeReplySerializer(obj.children.all(), many=True).data
+        return NoticeReplySerializer(
+            obj.children.filter(notice=obj.notice),
+            many=True
+        ).data
 
     def validate_comment(self, value):
         if not value.strip():
