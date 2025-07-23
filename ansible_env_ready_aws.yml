@@ -322,7 +322,7 @@
         content: |
           server {
               listen 80;
-              server_name hidcars.com www.hidcars.com api.hidcars.com 127.0.0.1 localhost;
+              server_name hidcars.com www.hidcars.com api.hidcars.com 127.0.0.1 localhost tf-alb-519393969.ap-northeast-2.elb.amazonaws.com;
 
               charset     utf-8;
               client_max_body_size 20M;
