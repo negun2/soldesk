@@ -34,6 +34,12 @@ class RecommendViewSet(viewsets.ModelViewSet):
     serializer_class = RecommendSerializer
     permission_classes = [IsAdminOrReadWriteBoard]
 
+# 임시
+class ScoreViewSet(viewsets.ModelViewSet):
+    queryset = Score.objects.all()
+    serializer_class = ScoreSerializer
+    permission_classes = [IsAdminOrReadWriteBoard]
+
 @ensure_csrf_cookie
 def test_csrf_view(request):
     return JsonResponse({"result": "ok"})
