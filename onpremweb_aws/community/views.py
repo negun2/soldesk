@@ -28,6 +28,11 @@ from .serializers import (
 from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
 
 
+# 임시
+class RecommendViewSet(viewsets.ModelViewSet):
+    queryset = Recommend.objects.all()
+    serializer_class = RecommendSerializer
+    permission_classes = [IsAdminOrReadWriteBoard]
 
 @ensure_csrf_cookie
 def test_csrf_view(request):
