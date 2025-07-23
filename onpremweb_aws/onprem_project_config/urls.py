@@ -6,6 +6,23 @@ from community.views import current_user, token_obtain_pair_view, test_csrf_view
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
+from community.views import current_user, token_obtain_pair_view, test_csrf_view
+from django.utils import timezone
+from django.contrib.auth.models import User
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            # username으로 유저 찾아서 last_login 갱신
+            username = request.data.get("username")
+            try:
+                user = User.objects.get(username=username)
+                user.last_login = timezone.now()
+                user.save(update_fields=['last_login'])
+            except User.DoesNotExist:
+                pass
+        return response
 
 urlpatterns = [
     path('api/', include('community.urls')),   # 반드시 SPA 라우팅보다 위에 위치
