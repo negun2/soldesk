@@ -1,4 +1,5 @@
 # onpremweb_aws/community/views.py
+from rest_framework import serializers
 from rest_framework import viewsets, generics, status, filters
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, BasePermission
 from rest_framework.decorators import api_view, permission_classes, action
