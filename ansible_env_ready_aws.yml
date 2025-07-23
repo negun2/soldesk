@@ -315,6 +315,16 @@
         - Reload systemd
         - Restart Gunicorn
 
+    - name: Ensure server_names_hash_bucket_size is set in nginx.conf
+      blockinfile:
+        path: /etc/nginx/nginx.conf
+        insertafter: 'http {'
+        marker: "# {mark} ANSIBLE server_names_hash_bucket_size"
+        block: |
+          server_names_hash_bucket_size 128;
+      notify: Reload nginx
+
+
     # 9. nginx vhost 설정 (SPA + API 프록시)
     - name: Deploy nginx vhost
       copy:
