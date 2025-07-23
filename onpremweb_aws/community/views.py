@@ -1,4 +1,5 @@
 # onpremweb_aws/community/views.py
+# community/views.py
 
 from rest_framework import viewsets, generics, status, filters
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, BasePermission
@@ -11,10 +12,6 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework_simplejwt.views import TokenObtainPairView
-token_obtain_pair_view = TokenObtainPairView.as_view()
-import boto3
-import uuid
-
 from .models import (
     Board, BoardImage, BestBoard, Notice, Feedback, FeedbackReply, FeedbackImage, Analysis,
     Recommend, Reply, Score, ErrorLog, Notification, NoticeReply, NoticeImage
@@ -26,20 +23,25 @@ from .serializers import (
     NotificationSerializer, NoticeReplySerializer, NoticeImageSerializer
 )
 from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
+import boto3
+import uuid
 
+### JWT Token View
+token_obtain_pair_view = TokenObtainPairView.as_view()
 
+### CSRF 테스트용
 @ensure_csrf_cookie
 def test_csrf_view(request):
     return JsonResponse({"result": "ok"})
 
-######################################
-# S3 Presigned URL 발급 (프론트가 S3 직접 업로드 후, S3 URL만 서버로 보내는 방식)
-######################################
+####################
+# S3 Presigned URL (프론트가 직접 업로드)
+####################
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def s3_presigned_upload(request):
     """
-    프론트에서 파일명/타입 보내면 S3 presigned 업로드 URL 반환
+    파일명/타입을 받아 S3 presigned 업로드 URL 반환 (프론트가 직접 S3에 업로드)
     """
     file_name = request.data['file_name']
     file_type = request.data['file_type']
@@ -66,9 +68,9 @@ def s3_presigned_upload(request):
         's3_url': f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
     })
 
-######################################
-# S3 이미지 파일 삭제 (DB에서 이미지 삭제할 때 S3에서도 삭제)
-######################################
+####################
+# S3 이미지 삭제
+####################
 def delete_s3_file(s3_key):
     s3 = boto3.client(
         's3',
@@ -78,25 +80,17 @@ def delete_s3_file(s3_key):
     )
     s3.delete_object(Bucket=settings.AWS_S3_BUCKET, Key=s3_key)
 
-######################################
-# 회원가입, 유저 정보, 이메일/아이디 중복 체크
-######################################
+####################
+# 유저 관련 기능
+####################
 @api_view(['GET'])
 def check_username(request):
-    """
-    ?username=abc
-    → { exists: true/false }
-    """
     username = request.GET.get('username', '')
     exists = User.objects.filter(username=username).exists()
     return Response({'exists': exists})
 
 @api_view(['GET'])
 def check_email(request):
-    """
-    ?email=abc@naver.com
-    → { exists: true/false }
-    """
     email = request.GET.get('email', '')
     exists = User.objects.filter(email=email).exists()
     return Response({'exists': exists})
@@ -104,57 +98,68 @@ def check_email(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def current_user(request):
-    """
-    현재 로그인 유저 정보
-    """
     serializer = UserDetailSerializer(request.user)
     return Response(serializer.data)
 
-######################################
-# 알림(Notification) ViewSet (내 알림만, 읽음 처리 등)
-######################################
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def user_list(request):
+    users = User.objects.all()
+    serializer = UserSimpleSerializer(users, many=True)
+    return Response(serializer.data)
+
+####################
+# 알림(Notification)
+####################
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # 내 알림만
         return Notification.objects.filter(to_user=self.request.user).order_by('-created_at')
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
-        """
-        POST /notifications/{id}/mark_read/
-        알림 읽음 처리
-        """
         notif = self.get_object()
         notif.is_read = True
         notif.save()
         return Response({'status': '읽음'})
 
-######################################
-# BoardImage/FeedbackImage/NoticeImage 업로드 (S3 URL을 받는다)
-######################################
+####################
+# Board/Feedback/Notice Image 업로드 - S3 URL을 DB에 저장
+####################
 class BoardImageUploadView(APIView):
-    """
-    게시글(Board) 이미지 업로드: S3 URL 받아서 DB 등록
-    """
     permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwargs):
         board_id = request.data.get('board_id')
         board = Board.objects.get(id=board_id)
-        s3_urls = request.data.getlist('s3_urls[]')  # 프론트에서 s3_urls[]로 전송
-        image_objs = [
-            BoardImage.objects.create(board=board, image=url) for url in s3_urls
-        ]
+        s3_urls = request.data.getlist('s3_urls[]')
+        image_objs = [BoardImage.objects.create(board=board, image=url) for url in s3_urls]
         serializer = BoardImageSerializer(image_objs, many=True)
         return Response(serializer.data)
 
+class FeedbackImageUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        feedback_id = request.data.get('feedback_id')
+        feedback = Feedback.objects.get(id=feedback_id)
+        s3_urls = request.data.getlist('s3_urls[]')
+        image_objs = [FeedbackImage.objects.create(feedback=feedback, image=url) for url in s3_urls]
+        serializer = FeedbackImageSerializer(image_objs, many=True)
+        return Response(serializer.data)
+
+class NoticeImageUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        notice_id = request.data.get('notice_id')
+        notice = Notice.objects.get(pk=notice_id)
+        s3_urls = request.data.getlist('s3_urls[]')
+        image_objs = [NoticeImage.objects.create(notice=notice, image=url) for url in s3_urls]
+        serializer = NoticeImageSerializer(image_objs, many=True)
+        return Response(serializer.data)
+
 class BoardImageViewSet(viewsets.ModelViewSet):
-    """
-    BoardImage 삭제시 S3에서 파일도 삭제
-    """
     queryset = BoardImage.objects.all()
     serializer_class = BoardImageSerializer
     permission_classes = [IsAuthenticated]
@@ -166,39 +171,9 @@ class BoardImageViewSet(viewsets.ModelViewSet):
         delete_s3_file(s3_key)
         instance.delete()
 
-class FeedbackImageUploadView(APIView):
-    """
-    피드백(Feedback) 이미지 업로드: S3 URL 받아서 DB 등록
-    """
-    permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwargs):
-        feedback_id = request.data.get('feedback_id')
-        feedback = Feedback.objects.get(id=feedback_id)
-        s3_urls = request.data.getlist('s3_urls[]')
-        image_objs = [
-            FeedbackImage.objects.create(feedback=feedback, image=url) for url in s3_urls
-        ]
-        serializer = FeedbackImageSerializer(image_objs, many=True)
-        return Response(serializer.data)
-
-class NoticeImageUploadView(APIView):
-    """
-    공지사항(Notice) 이미지 업로드: S3 URL 받아서 DB 등록
-    """
-    permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwargs):
-        notice_id = request.data.get('notice_id')
-        notice = Notice.objects.get(pk=notice_id)
-        s3_urls = request.data.getlist('s3_urls[]')
-        image_objs = [
-            NoticeImage.objects.create(notice=notice, image=url) for url in s3_urls
-        ]
-        serializer = NoticeImageSerializer(image_objs, many=True)
-        return Response(serializer.data)
-
-######################################
-# 게시글/피드백/공지사항 CRUD ViewSet (아래는 기본 구조, 상세는 기존 코드 유지해도 됨)
-######################################
+####################
+# 게시글/피드백/공지사항/댓글 CRUD (댓글 생성 시 알림까지)
+####################
 class BoardViewSet(viewsets.ModelViewSet):
     queryset = Board.objects.all()
     serializer_class = BoardSerializer
@@ -221,8 +196,28 @@ class BoardViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        board = serializer.save(author=self.request.user)
-        return board
+        return serializer.save(author=self.request.user)
+
+class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Board.objects.all()
+    serializer_class = BoardSerializer
+    permission_classes = [IsAdminOrReadWriteBoard]
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['id', 'post_date', 'recommend_count', 'title', 'author__username']
+    ordering = ['-recommend_count']
+    search_fields = ['title', 'content', 'author__username']
+
+class BoardLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
+        board = Board.objects.get(pk=pk)
+        user = request.user
+        if Recommend.objects.filter(board=board, user=user).exists():
+            return Response({"detail": "이미 좋아요를 눌렀습니다."}, status=400)
+        Recommend.objects.create(board=board, user=user)
+        board.recommend_count = Recommend.objects.filter(board=board).count()
+        board.save(update_fields=['recommend_count'])
+        return Response({"detail": "좋아요!"})
 
 class FeedbackViewSet(viewsets.ModelViewSet):
     queryset = Feedback.objects.all()
@@ -246,6 +241,9 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user=self.request.user)
         return queryset
 
+    def perform_create(self, serializer):
+        return serializer.save(user=self.request.user)
+
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
@@ -255,9 +253,9 @@ class NoticeViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     search_fields = ['title', 'content', 'user__username']
 
-######################################
-# 댓글/대댓글 CRUD (Board/Feedback/Notice)
-######################################
+    def perform_create(self, serializer):
+        return serializer.save(user=self.request.user)
+
 class ReplyViewSet(viewsets.ModelViewSet):
     queryset = Reply.objects.all()
     serializer_class = ReplySerializer
@@ -321,28 +319,9 @@ class NoticeReplyViewSet(viewsets.ModelViewSet):
             )
         return reply
 
-######################################
-# 기타 ViewSet: 추천, 점수, 에러, 관리자용 유저 등
-######################################
-class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Board.objects.all()
-    serializer_class = BoardSerializer
-    permission_classes = [IsAdminOrReadWriteBoard]
-    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
-    ordering_fields = ['id', 'post_date', 'recommend_count', 'title', 'author__username']
-    ordering = ['-recommend_count']
-    search_fields = ['title', 'content', 'author__username']
-
-class BoardLikeView(APIView):
-    permission_classes = [IsAuthenticated]
-    def post(self, request, pk):
-        board = Board.objects.get(pk=pk)
-        user = request.user
-        # 예시: 추천 추가 로직
-        board.recommend_count += 1
-        board.save()
-        return Response({'status': 'liked', 'recommend_count': board.recommend_count})
-
+####################
+# 관리자/분석/추천/점수/에러 로그 뷰셋
+####################
 class AnalysisViewSet(viewsets.ModelViewSet):
     queryset = Analysis.objects.all()
     serializer_class = AnalysisSerializer
@@ -363,6 +342,47 @@ class ErrorLogViewSet(viewsets.ModelViewSet):
     serializer_class = ErrorLogSerializer
     permission_classes = [IsAdminUser]
 
+####################
+# 회원가입/Register
+####################
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
+
+####################
+# 유저 뷰셋 (자기 자신/관리자만 상세/삭제/비번변경)
+####################
+class SetPasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()
+
+class IsAdminOrSelf(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return request.user.is_staff or obj == request.user
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSimpleSerializer
+    permission_classes = [IsAdminOrSelf]
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return UserDetailSerializer
+        return UserSimpleSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.is_staff:
+            return Response({'detail': '관리자는 삭제할 수 없습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='set_password')
+    def set_password(self, request, pk=None):
+        user = self.get_object()
+        serializer = SetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not user.check_password(serializer.validated_data['old_password']):
+            return Response({'detail': '현재 비밀번호가 올바르지 않습니다.'}, status=400)
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        return Response({'detail': '비밀번호가 변경되었습니다.'})
