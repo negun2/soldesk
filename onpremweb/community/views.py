@@ -135,6 +135,13 @@ class BoardViewSet(viewsets.ModelViewSet):
         print("BoardViewSet.retrieve 호출됨!!")
         return super().retrieve(request, *args, **kwargs)    
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(author=self.request.user)
+        return queryset
+
 class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Board.objects.all()  # 슬라이싱 제거!
     serializer_class = BoardSerializer
@@ -173,6 +180,13 @@ class ReplyViewSet(viewsets.ModelViewSet):
                 notif_type='comment',
                 message=f"{self.request.user.username}님이 회원님의 게시글에 댓글을 남겼습니다."
             )
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(author=self.request.user)
+        return queryset
 
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -217,6 +231,13 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context  
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(user=self.request.user)
+        return queryset
 
 class FeedbackReplyViewSet(viewsets.ModelViewSet):
     queryset = FeedbackReply.objects.all()
