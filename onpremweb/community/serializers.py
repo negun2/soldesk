@@ -228,3 +228,6 @@ class ErrorLogSerializer(serializers.ModelSerializer):
         model = ErrorLog
         fields = '__all__'
         
+class SetPasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()
