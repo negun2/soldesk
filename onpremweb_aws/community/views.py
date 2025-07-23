@@ -27,53 +27,18 @@ from rest_framework import serializers
 import boto3
 import uuid
 
-def delete_s3_file(s3_key):
-    s3 = boto3.client(
-        's3',
-        region_name=settings.AWS_REGION
-    )
-    s3.delete_object(Bucket=settings.AWS_S3_BUCKET, Key=s3_key)
 
-class BoardImageViewSet(viewsets.ModelViewSet):
-    queryset = BoardImage.objects.all()
-    serializer_class = BoardImageSerializer
-    permission_classes = [IsAuthenticated]
-    def perform_destroy(self, instance):
-        s3_key = instance.image.replace(
-            f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/", ""
-        )
-        delete_s3_file(s3_key)
-        instance.delete()
+@api_view(['GET'])
+def check_username(request):
+    username = request.GET.get('username', '')
+    exists = User.objects.filter(username=username).exists()
+    return Response({'exists': exists})
 
-
-class FeedbackImageUploadView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwargs):
-        feedback_id = request.data.get('feedback_id')
-        feedback = Feedback.objects.get(id=feedback_id)
-        s3_urls = request.data.getlist('s3_urls[]')
-        image_objs = []
-        for url in s3_urls:
-            img_obj = FeedbackImage.objects.create(feedback=feedback, image=url)
-            image_objs.append(img_obj)
-        serializer = FeedbackImageSerializer(image_objs, many=True, context={'request': request})
-        return Response(serializer.data)
-
-
-class NoticeImageUploadView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwargs):
-        notice_id = request.data.get('notice_id')
-        notice = Notice.objects.get(pk=notice_id)
-        s3_urls = request.data.getlist('s3_urls[]')
-        image_objs = []
-        for url in s3_urls:
-            img_obj = NoticeImage.objects.create(notice=notice, image=url)
-            image_objs.append(img_obj)
-        serializer = NoticeImageSerializer(image_objs, many=True)
-        return Response(serializer.data)
+@api_view(['GET'])
+def check_email(request):
+    email = request.GET.get('email', '')
+    exists = User.objects.filter(email=email).exists()
+    return Response({'exists': exists})
 
 
 @api_view(['POST'])
@@ -86,7 +51,7 @@ def s3_presigned_upload(request):
         's3',
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name='ap-northeast-2'  # 서울 이미지 버킷
+        region_name='ap-northeast-1'  # 도쿄 이미지 버킷
     )
     url = s3.generate_presigned_url(
         ClientMethod='put_object',
@@ -101,13 +66,6 @@ def s3_presigned_upload(request):
     )
     return Response({'url': url, 's3_url': f"https://hidcars-image-2.s3.ap-northeast-2.amazonaws.com/{s3_key}"})
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def current_user(request):
-    """ GET /api/me/ → 유저 정보 """
-    serializer = UserDetailSerializer(request.user)
-    return Response(serializer.data)
-
 @csrf_exempt
 def token_obtain_pair_view(request, *args, **kwargs):
     view = TokenObtainPairView.as_view()
@@ -119,6 +77,13 @@ def test_csrf_view(request):
     resp.set_cookie("testcookie", "TESTCOOKIE", path="/")
     resp['Set-Cookie'] = "testcustomcookie=MYTEST; Path=/"
     return resp
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    """ GET /api/me/ → 유저 정보 """
+    serializer = UserDetailSerializer(request.user)
+    return Response(serializer.data)
 
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
@@ -143,15 +108,13 @@ class BoardImageUploadView(APIView):
     def post(self, request, *args, **kwargs):
         board_id = request.data.get('board_id')
         board = Board.objects.get(id=board_id)
-        # 이미지를 프론트에서 S3 presigned로 올린 뒤, s3_url을 POST로 전달
-        s3_urls = request.data.getlist('s3_urls[]')  # 여러 개일 경우
+        image_files = request.FILES.getlist('images')
         image_objs = []
-        for url in s3_urls:
-            img_obj = BoardImage.objects.create(board=board, image=url)
+        for img in image_files:
+            img_obj = BoardImage.objects.create(board=board, image=img)
             image_objs.append(img_obj)
         serializer = BoardImageSerializer(image_objs, many=True, context={'request': request})
         return Response(serializer.data)
-
 
 # 게시판(일반/베스트): 전체 사용자 허용 (쓰기 포함), 수정/삭제는 작성자/관리자만
 class BoardViewSet(viewsets.ModelViewSet):
@@ -172,6 +135,13 @@ class BoardViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         print("BoardViewSet.retrieve 호출됨!!")
         return super().retrieve(request, *args, **kwargs)    
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(author=self.request.user)
+        return queryset
 
 class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Board.objects.all()  # 슬라이싱 제거!
@@ -212,6 +182,13 @@ class ReplyViewSet(viewsets.ModelViewSet):
                 message=f"{self.request.user.username}님이 회원님의 게시글에 댓글을 남겼습니다."
             )
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(author=self.request.user)
+        return queryset
+
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, pk):
@@ -223,6 +200,21 @@ class BoardLikeView(APIView):
         board.recommend_count = Recommend.objects.filter(board=board).count()
         board.save(update_fields=['recommend_count'])
         return Response({"detail": "좋아요!"})
+
+class FeedbackImageUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        feedback_id = request.data.get('feedback_id')
+        feedback = Feedback.objects.get(id=feedback_id)
+        image_files = request.FILES.getlist('images')
+        image_objs = []
+        for img in image_files:
+            img_obj = FeedbackImage.objects.create(feedback=feedback, image=img)
+            image_objs.append(img_obj)
+        serializer = FeedbackImageSerializer(image_objs, many=True, context={'request': request})
+        return Response(serializer.data)
 
 class FeedbackViewSet(viewsets.ModelViewSet):
     queryset = Feedback.objects.all()
@@ -241,6 +233,13 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context  
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        my = self.request.query_params.get('my')
+        if my and self.request.user.is_authenticated:
+            queryset = queryset.filter(user=self.request.user)
+        return queryset
+
 class FeedbackReplyViewSet(viewsets.ModelViewSet):
     queryset = FeedbackReply.objects.all()
     serializer_class = FeedbackReplySerializer
@@ -250,6 +249,19 @@ class FeedbackReplyViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
+    def perform_create(self, serializer):
+        reply = serializer.save(author=self.request.user)
+        feedback = reply.feedback
+        if feedback.user != self.request.user:
+            from .models import Notification
+            Notification.objects.create(
+                to_user=feedback.user,
+                feedback=feedback,
+                feedback_reply=reply,
+                notif_type='feedback_reply',
+                message=f"{self.request.user.username}님이 회원님의 피드백에 댓글을 남겼습니다."
+            )
 
 class SetPasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
@@ -298,6 +310,19 @@ def current_user(request):
     return Response(serializer.data)
 
 # 나머지 게시판: 관리자만
+class NoticeImageUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        notice_id = request.data.get('notice_id')
+        notice = Notice.objects.get(pk=notice_id)
+        images = request.FILES.getlist('images')
+        image_objs = []
+        for img in images:
+            image_obj = NoticeImage.objects.create(notice=notice, image=img)
+            image_objs.append(image_obj)
+        serializer = NoticeImageSerializer(image_objs, many=True)
+        return Response(serializer.data)
 
 class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
@@ -322,6 +347,20 @@ class NoticeReplyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def perform_create(self, serializer):
+        reply = serializer.save(author=self.request.user)
+        notice = reply.notice
+        if notice.user != self.request.user:
+            from .models import Notification
+            Notification.objects.create(
+                to_user=notice.user,
+                notice=notice,
+                notice_reply=reply,
+                notif_type='notice_reply',
+                message=f"{self.request.user.username}님이 회원님의 공지사항에 댓글을 남겼습니다."
+            )
+
 
 
 @api_view(['GET'])
