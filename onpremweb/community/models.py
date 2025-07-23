@@ -124,6 +124,9 @@ class Reply(models.Model):
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['created_at']
+
 class Score(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
