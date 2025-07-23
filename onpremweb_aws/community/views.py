@@ -133,7 +133,10 @@ class BoardImageUploadView(APIView):
     def post(self, request, *args, **kwargs):
         board_id = request.data.get('board_id')
         board = Board.objects.get(id=board_id)
-        s3_urls = request.data.getlist('s3_urls[]')
+        # getlist → get
+        s3_urls = request.data.get('s3_urls', [])
+        if not isinstance(s3_urls, list):
+            return Response({'error': 's3_urls는 리스트여야 합니다.'}, status=400)
         image_objs = [BoardImage.objects.create(board=board, image=url) for url in s3_urls]
         serializer = BoardImageSerializer(image_objs, many=True)
         return Response(serializer.data)
@@ -143,7 +146,9 @@ class FeedbackImageUploadView(APIView):
     def post(self, request, *args, **kwargs):
         feedback_id = request.data.get('feedback_id')
         feedback = Feedback.objects.get(id=feedback_id)
-        s3_urls = request.data.getlist('s3_urls[]')
+        s3_urls = request.data.get('s3_urls', [])
+        if not isinstance(s3_urls, list):
+            return Response({'error': 's3_urls는 리스트여야 합니다.'}, status=400)
         image_objs = [FeedbackImage.objects.create(feedback=feedback, image=url) for url in s3_urls]
         serializer = FeedbackImageSerializer(image_objs, many=True)
         return Response(serializer.data)
@@ -153,7 +158,9 @@ class NoticeImageUploadView(APIView):
     def post(self, request, *args, **kwargs):
         notice_id = request.data.get('notice_id')
         notice = Notice.objects.get(pk=notice_id)
-        s3_urls = request.data.getlist('s3_urls[]')
+        s3_urls = request.data.get('s3_urls', [])
+        if not isinstance(s3_urls, list):
+            return Response({'error': 's3_urls는 리스트여야 합니다.'}, status=400)
         image_objs = [NoticeImage.objects.create(notice=notice, image=url) for url in s3_urls]
         serializer = NoticeImageSerializer(image_objs, many=True)
         return Response(serializer.data)
