@@ -8,9 +8,10 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework_simplejwt.views import TokenObtainPairView
+token_obtain_pair_view = TokenObtainPairView.as_view()
 import boto3
 import uuid
 
@@ -25,6 +26,12 @@ from .serializers import (
     NotificationSerializer, NoticeReplySerializer, NoticeImageSerializer
 )
 from .permissions import IsAdminOrReadWriteBoard, IsAdminOrReadOnly
+
+
+
+@ensure_csrf_cookie
+def test_csrf_view(request):
+    return JsonResponse({"result": "ok"})
 
 ######################################
 # S3 Presigned URL 발급 (프론트가 S3 직접 업로드 후, S3 URL만 서버로 보내는 방식)
