@@ -13,7 +13,7 @@ from .views_presigned import s3_presigned_upload
 router = DefaultRouter()
 router.register(r'notifications', NotificationViewSet)
 router.register(r'users', UserViewSet)
-router.register(r'analysis', AnalysisViewSet)
+#router.register(r'analysis', AnalysisViewSet)
 router.register(r'boards', BoardViewSet)
 router.register(r'recommends', RecommendViewSet)
 router.register(r'feedbacks', FeedbackViewSet)
