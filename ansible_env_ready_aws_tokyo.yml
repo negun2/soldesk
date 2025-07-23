@@ -346,10 +346,10 @@
                   proxy_set_header X-Forwarded-Proto $scheme;
 
                   # CORS/CSRF 헤더 직접 추가 (API 경로만!)
-                  add_header 'Access-Control-Allow-Origin' 'https://www.hidcars.com' always;
-                  add_header 'Access-Control-Allow-Credentials' 'true' always;
-                  add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,X-CSRFToken' always;
-                  add_header 'Access-Control-Allow-Methods' 'GET,POST,PUT,PATCH,DELETE,OPTIONS' always;
+                  #add_header 'Access-Control-Allow-Origin' 'https://www.hidcars.com' always;
+                  #add_header 'Access-Control-Allow-Credentials' 'true' always;
+                  #add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,X-CSRFToken' always;
+                  #add_header 'Access-Control-Allow-Methods' 'GET,POST,PUT,PATCH,DELETE,OPTIONS' always;
 
                   proxy_pass http://unix:{{ app_home }}/onpremweb.sock;
               }
