@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.generic import TemplateView
 from community.views import current_user, token_obtain_pair_view, test_csrf_view
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from django.conf import settings
 from django.conf.urls.static import static
 from community.views import current_user, token_obtain_pair_view, test_csrf_view
