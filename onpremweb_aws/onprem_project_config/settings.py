@@ -126,7 +126,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
-    "http://hidcars.com:80",    
+    "http://hidcars.com:80",
+    "https://www.hidcars.com",     # ← 실서비스 도메인(SSL)
+    "https://hidcars.com",      
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -134,11 +136,13 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
-    "http://hidcars.com:80",  
+    "http://hidcars.com:80",
+    "https://www.hidcars.com",     # ← 실서비스 도메인(SSL)
+    "https://hidcars.com",    
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_DOMAIN = '127.0.0.1'
+CSRF_COOKIE_DOMAIN = '.hidcars.com'
 #MIDDLEWARE.remove('django.middleware.csrf.CsrfViewMiddleware')
