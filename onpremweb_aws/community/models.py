@@ -56,7 +56,7 @@ class Board(models.Model):
 
 class BoardImage(models.Model):
     board = models.ForeignKey(Board, related_name='images', on_delete=models.CASCADE)
-    image = models.CharField(max_length=512)  # presigned URL 저장용
+    image = models.CharField(max_length=2048)  # presigned URL 저장용
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
 class Recommend(models.Model):
@@ -74,7 +74,7 @@ class Feedback(models.Model):
 
 class FeedbackImage(models.Model):
     feedback = models.ForeignKey(Feedback, related_name='images', on_delete=models.CASCADE)
-    image = models.CharField(max_length=512)  # presigned url로 저장
+    image = models.CharField(max_length=2048)  # presigned url로 저장
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
 class FeedbackReply(models.Model):
@@ -103,7 +103,7 @@ class Notice(models.Model):
 
 class NoticeImage(models.Model):
     notice = models.ForeignKey(Notice, related_name='images', on_delete=models.CASCADE)
-    image = models.CharField(max_length=512)  # presigned url로 저장
+    image = models.CharField(max_length=2048)  # presigned url로 저장
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
 class NoticeReply(models.Model):
