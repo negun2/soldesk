@@ -343,4 +343,8 @@ class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, pk):
         board = Board.objects.get(pk=pk)
-        user = request.use
+        user = request.user
+        # 예시: 추천 추가 로직
+        board.recommend_count += 1
+        board.save()
+        return Response({'status': 'liked', 'recommend_count': board.recommend_count})
