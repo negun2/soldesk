@@ -263,13 +263,21 @@ class NoticeViewSet(viewsets.ModelViewSet):
         return serializer.save(user=self.request.user)
 
 class ReplyViewSet(viewsets.ModelViewSet):
-    queryset = Reply.objects.all()
     serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Reply.objects.all()
+        board_id = self.request.query_params.get('board')
+        if board_id:
+            queryset = queryset.filter(board_id=board_id)
+        return queryset
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
     def perform_create(self, serializer):
         reply = serializer.save(author=self.request.user)
         board = reply.board
