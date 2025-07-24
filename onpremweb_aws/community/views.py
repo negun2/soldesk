@@ -263,6 +263,7 @@ class NoticeViewSet(viewsets.ModelViewSet):
         return serializer.save(user=self.request.user)
 
 class ReplyViewSet(viewsets.ModelViewSet):
+    queryset = Reply.objects.all() 
     serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
 
