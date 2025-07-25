@@ -120,22 +120,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# AWS S3 관련 환경변수 로드
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')
-AWS_REGION = os.getenv('AWS_REGION')
-
-
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
-    "http://hidcars.com:80",
-    "https://www.hidcars.com",     # ← 실서비스 도메인(SSL)
-    "https://hidcars.com",      
+    "http://hidcars.com:80",    
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -143,13 +134,11 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:80",
     "http://localhost:3000",
     "http://localhost:80",
-    "http://hidcars.com:80",
-    "https://www.hidcars.com",     # ← 실서비스 도메인(SSL)
-    "https://hidcars.com",    
+    "http://hidcars.com:80",  
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_DOMAIN = '.hidcars.com'
+CSRF_COOKIE_DOMAIN = '127.0.0.1'
 #MIDDLEWARE.remove('django.middleware.csrf.CsrfViewMiddleware')
