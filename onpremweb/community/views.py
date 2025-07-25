@@ -40,6 +40,7 @@ def check_email(request):
     exists = User.objects.filter(email=email).exists()
     return Response({'exists': exists})
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def s3_presigned_upload(request):
@@ -158,10 +159,17 @@ class BestBoardViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['title', 'content', 'author__username']
 
 class ReplyViewSet(viewsets.ModelViewSet):
-    queryset = Reply.objects.all()
+    queryset = Reply.objects.all() 
     serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
- 
+
+    def get_queryset(self):
+        queryset = Reply.objects.all()
+        board_id = self.request.query_params.get('board')
+        if board_id:
+            queryset = queryset.filter(board_id=board_id)
+        return queryset
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
@@ -170,9 +178,8 @@ class ReplyViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         reply = serializer.save(author=self.request.user)
         board = reply.board
-        # 자기 댓글이 아니고, 본인이 쓴 글이 아니면 알림
+        # 1. 게시글 작성자에게 알림 (내가 아니면)
         if board.author != self.request.user:
-            from .models import Notification
             Notification.objects.create(
                 to_user=board.author,
                 board=board,
@@ -180,13 +187,16 @@ class ReplyViewSet(viewsets.ModelViewSet):
                 notif_type='comment',
                 message=f"{self.request.user.username}님이 회원님의 게시글에 댓글을 남겼습니다."
             )
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        my = self.request.query_params.get('my')
-        if my and self.request.user.is_authenticated:
-            queryset = queryset.filter(author=self.request.user)
-        return queryset
+        # 2. 부모 댓글 작성자(있고, 내가 아니고, 게시글 작성자와도 다르면)에게도 알림
+        if reply.parent and reply.parent.author != self.request.user and reply.parent.author != board.author:
+            Notification.objects.create(
+                to_user=reply.parent.author,
+                board=board,
+                reply=reply,
+                notif_type='comment',
+                message=f"{self.request.user.username}님이 회원님의 댓글에 답글을 남겼습니다."
+            )
+        return reply
 
 class BoardLikeView(APIView):
     permission_classes = [IsAuthenticated]
