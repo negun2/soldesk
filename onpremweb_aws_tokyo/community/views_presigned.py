@@ -1,4 +1,4 @@
-# onpremweb/community/views_presigned.py
+# onpremweb_aws/community/views_presigned.py
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -24,7 +24,7 @@ def s3_presigned_upload(request):
             'Bucket': settings.AWS_S3_BUCKET,
             'Key': s3_key,
             'ContentType': file_type,
-            'ACL': 'public-read'
+            #'ACL': 'public-read'
         },
         ExpiresIn=300,
         HttpMethod='PUT'
