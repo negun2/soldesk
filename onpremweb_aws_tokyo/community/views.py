@@ -282,6 +282,7 @@ class ReplyViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         reply = serializer.save(author=self.request.user)
         board = reply.board
+        # 1. 게시글 작성자에게 알림 (내가 아니면)
         if board.author != self.request.user:
             Notification.objects.create(
                 to_user=board.author,
@@ -289,6 +290,15 @@ class ReplyViewSet(viewsets.ModelViewSet):
                 reply=reply,
                 notif_type='comment',
                 message=f"{self.request.user.username}님이 회원님의 게시글에 댓글을 남겼습니다."
+            )
+        # 2. 부모 댓글 작성자(있고, 내가 아니고, 게시글 작성자와도 다르면)에게도 알림
+        if reply.parent and reply.parent.author != self.request.user and reply.parent.author != board.author:
+            Notification.objects.create(
+                to_user=reply.parent.author,
+                board=board,
+                reply=reply,
+                notif_type='comment',
+                message=f"{self.request.user.username}님이 회원님의 댓글에 답글을 남겼습니다."
             )
         return reply
 
