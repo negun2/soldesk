@@ -265,9 +265,10 @@
     - name: Generate SECRET_KEY if missing
       lineinfile:
         path: "{{ app_home }}/.env"
-        line: "SECRET_KEY={{ lookup('password', '/etc/ansible/secret.key length=50 chars=ascii_letters') }}"
+        line: "SECRET_KEY={{ lookup('password', app_home + '/secret.key length=50 chars=ascii_letters') }}"
         insertafter: '^DEBUG='
       when: secret_key_check.rc != 0
+
 
     # 7. Django 초기화: migrate/staticfiles/슈퍼유저
     - name: Make & apply community migrations
